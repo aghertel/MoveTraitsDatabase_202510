@@ -8,16 +8,17 @@ library(lubridate);library(metafor);library(tidyverse);library(amt);
 library(adehabitatHR); library(move2); library(epitools); library(suncalc); library(purrr); library(bit64)
 library(dggridR);library(mapview)
 ## ----Import movement data per individual-------------------------------------------------------------
-pathTOfolder <- "./StandardGrid/DATA/"
-
+pathTOfolder <- "./DATA/MoveTraitsData/"
 pthamt1h <- paste0(pathTOfolder,"4.MB_indv_amt_1h/")
 
 #dir for individual summaries
-dir.create(paste0(pathTOfolder,"5.MB_indv_traitsum"))
-pthtraitsum <- paste0(pathTOfolder,"5.MB_indv_traitsum/")
+pathTOfolder2 <- "./updates_work_in_progress/DATA/"
+dir.create(paste0(pathTOfolder2,"5.MB_indv_traitsum"))
+pthtraitsum <- paste0(pathTOfolder2,"5.MB_indv_traitsum/")
+
 #dir for individual underlying traits
-dir.create(paste0(pathTOfolder,"6.MB_indv_trait"))
-pthtrait <- paste0(pathTOfolder,"6.MB_indv_trait/")
+dir.create(paste0(pathTOfolder2,"6.MB_indv_trait"))
+pthtrait <- paste0(pathTOfolder2,"6.MB_indv_trait/")
 
 #spatial grid
 dggs.100    <- dgconstruct(projection = "ISEA", area = 10000, resround='nearest')
@@ -30,14 +31,19 @@ done <- list.files(pthtraitsum, full.names = F)
 flsMV <- flsMV[!flsMV%in%done]
 
 #filter excluded studies
-referenceTableStudies <- readRDS(paste0(pathTOfolder,"/referenceTableStudies_ALL_excludedColumn.rds"))
+referenceTableStudies <- readRDS(paste0(pathTOfolder,"referenceTableStudies_ALL_excludedColumn.rds"))
 referenceTableStudiesUsed <- referenceTableStudies[referenceTableStudies$excluded=="no",]
 
 flsMV <- flsMV[flsMV %in% referenceTableStudiesUsed$fileName]
 
 #lapply(flsMV, function(indPth)
 #  {
-animlocs.1hourly <- readRDS(paste0(pthamt1h,"3809257699_3809647332.rds")) #  #446579_7945602.rds
+
+# example ciconia ciconia - 10596067_10666985.rds
+# example anas platyrhynchos - #446579_7945602.rds
+# example panthera leo - 3809257699_3809647332.rds
+
+animlocs.1hourly <- readRDS(paste0(pthamt1h,"3809257699_3809647332.rds")) 
 
   #coordinates for individual summaries
   cell_info.100 <- dgGEO_to_SEQNUM(dggs.100, animlocs.1hourly$x_, animlocs.1hourly$y_)
