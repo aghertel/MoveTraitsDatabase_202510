@@ -1,5 +1,7 @@
 # Data files
 DATA
+updates_work_in_progress/DATA
+updates_work_in_progress/Hex
 # History files
 .Rhistory
 .Rapp.history

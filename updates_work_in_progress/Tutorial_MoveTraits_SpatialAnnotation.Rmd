@@ -1,0 +1,174 @@
+---
+title: "MoveTraits.V0.1 Spatial Annotation Tutorial"
+author: "Anne G. Hertel"
+date: "3/5/2026"
+output:
+  html_document:
+    theme: cosmo
+    toc: true
+    toc_float:
+      collapsed: true
+    code_folding: show
+  pdf_document:
+    toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r packages, warning=FALSE,message=FALSE}
+library(tidyverse);library(bit64); library(geodata);library(dggridR);library(terra); library(sf);library(terra); library(mapview)
+```
+
+# Download the database
+
+Please download the three levels of the database from figshare and store in your local directory:
+
+https://doi.org/10.6084/m9.figshare.28611890.v2
+
+# Load MoveTraits database
+
+The MoveTraits database version 0.1 has been compiled from open access data from Tucker et al. 2023 "Behavioral responses of terrestrial mammals to COVID-19 lockdowns" (https://zenodo.org/records/7704108, file "Tucker_Road_Spatial.rds"; only data from 2019) and from all openly available GPS datasets in Movebank (effective 03.2025). 
+
+The database has three levels: species level trait summaries, individual level traits summaries, within individual repeated trait measures. The three levels are stored in separate files.
+
+# Spatial grid
+We have annotated traits with spatial grids to facilitate spatial annotation while protecting the underlying gps coordinates. We are using hexagonal equal area grids at approxiamately 1square kilometer (1km resolution), 100 square kilometer (10km resolution) and 10000 square kilometer (100km resolution). 
+
+```{r}
+dggs.100    <- dgconstruct(projection = "ISEA", area = 10000, resround='nearest')
+dggs.10     <- dgconstruct(projection = "ISEA", area = 100, resround='nearest')
+dggs.1      <- dgconstruct(projection = "ISEA", area = 1, resround='nearest')
+```
+
+An example how the grid looks like - we are here showing exemplary the grid cells at 100km resolution (10000 square km) intersecting Germany. 
+```{r}
+grid <- dgearthgrid(dggs.100, savegrid = NA, return_sf = TRUE) 
+
+ger_sf <- map_data("world") %>%
+  filter(region == "Germany") |> 
+  st_as_sf(coords = c("long", "lat"), crs = 4326, agr = "constant") %>%
+  group_by(group) %>%
+  summarise(geometry = st_combine(geometry)) %>%
+  st_cast("POLYGON") %>%
+  st_union() %>%
+  st_sf() 
+
+cropped_poly <- st_intersection(grid, ger_sf)
+
+ggplot() +
+  geom_sf     (data=ger_sf, color=alpha("black"), fill = NA) +
+  geom_sf     (data=cropped_poly, color=alpha("black"), fill = NA) +
+  theme_minimal() 
+
+```
+
+## Species level - not yet implemented
+
+```{r}
+#MoveTrait.v0.1.sp <- readRDS("MoveTrait.v0.1_species.sum_20251011.rds")
+
+dim(MoveTrait.v0.1.sp)
+```
+
+
+## Individual level
+
+```{r}
+MoveTrait.v0.1.ind <- readRDS("StandardGrid/DATA/5.MB_indv_traitsum/10596067_10666985.rds")
+#MoveTrait.v0.1.ind$study_id <- as.integer64(MoveTrait.v0.1.ind$study_id)
+```
+
+The individual level database follows the same structure as the species level database. But contains more individual level information:
+
+```{r, echo = F}
+column_info <- data.frame(
+  ColumnName = 
+    c(names(MoveTrait.v0.1.ind)[1:6]
+      ),
+  Explanation = c(
+    "Movebank study identifier",
+    "Movebank individual identifier",
+    "The individuals mean track longitude",
+    "The individuals mean track latitude",
+    "Intersecting 100km grid cell identities",
+    "Intersecting 10km grid cell identities"
+  )
+)
+
+knitr::kable(column_info, caption = "Column descriptions")
+```
+
+From cell identity to spatial annotation
+```{r,echo=F}
+grid.id.100km <- as.numeric(unlist(strsplit(MoveTrait.v0.1.ind$grid.id.100km, ";")))
+print(grid.id.100km)
+length(grid.id.100km)
+```
+
+The animal moved over 87 grid cells of 100km resolution (10000 square km). Therefore the trait summary is associated to that space. 
+
+Where did the animal occur?
+```{r}
+intersect_cells_100 <- dgcellstogrid(dggs.100, grid.id.100km)
+mapview(intersect_cells_100, map.types = c("OpenStreetMap.DE"), col.regions = "green", legend = FALSE)
+```
+
+Get the centroid coordinates of these cells to intersect with environmental layers
+```{r}
+lon <- dgSEQNUM_to_GEO(dggs.100, grid.id.100km)$lon_deg
+lat <- dgSEQNUM_to_GEO(dggs.100, grid.id.100km)$lat_deg
+centroids <- data.frame(grid.id.100km,lon,lat)
+```
+
+Example - load and extract HFI values associated with the animals occurrence
+```{r}
+hfi <- geodata::footprint(year = 2009, path = ".")
+pts <- vect(centroids, crs = "EPSG:4326")
+values <- terra::extract(hfi, pts, ID = FALSE, bind = TRUE)
+head(values)
+```
+
+```{r}
+plot(hfi)
+plot(pts, add = TRUE, col = "red", pch = 16)
+```
+
+## Monthly summary
+
+
+
+## Within Individual level
+
+```{r}
+MoveTrait.v0.1_rep.ind <- readRDS("StandardGrid/DATA/6.MB_indv_trait/10596067_10666985.rds")
+```
+
+The third level of the database provides repeated individual trait measures. It is structured in the following way - first we provide the individual level summaries, simialr to "MoveTrait.v0.1.ind", for each individual and every trait we provide the underlying repeated trait measures as a list of nested dataframes in columns 91 - 103
+
+```{r}
+names(MoveTrait.v0.1_rep.ind[,85:94])
+class(MoveTrait.v0.1_rep.ind[,86])
+```
+
+For example for column 85 - "MaxDispl.24h" (24hr displacement), the underlying distribution for the first individual in the dataframe can be accessed in the following way. 
+It contains the mean latitude and longitude of that day for open access data. For closed access data it contains the identity of the grid cell that contains the mean coordinate, at either 10km, or 10 and 1km resolution, depending on the data owner's sharing selection. Because only one coordinate is associated with every repeated trait measure, we here already provide the grid cell centroids in the database (????).
+
+```{r}
+MoveTrait.v0.1_rep.ind[,86][[1]]
+displ24h <-data.frame(MoveTrait.v0.1_rep.ind[,86][[1]])
+```
+
+These centroids can be directly used to associate environmental layers.
+```{r, echo = F}
+pts <- terra::vect(displ24h, geom=c("lon.10km", "lat.10km"), crs = "EPSG:4326")
+values <- terra::extract(hfi, pts, ID = FALSE, bind = TRUE)
+```
+
+```{r}
+intersect_cells_10 <- dgcellstogrid(dggs.10, displ24h$grid.id.10km)
+mapview(intersect_cells_10, col.regions = "red", legend = FALSE)
+
+```
+
