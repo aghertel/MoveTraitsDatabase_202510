@@ -47,25 +47,29 @@ dmax24 <-
 
   # Final NULL checks
   if (is.null(dmax24) || nrow(dmax24) == 0) return(NULL)
-  
+ 
+if(is.null(dmax7d)) NULL else {
   # Spatial annotation 10km
   cell_info_10 <- dgGEO_to_SEQNUM(dggs.10, mean.coord$mean.x, mean.coord$mean.y)
   dmax24$grid.id.10km <- cell_info_10$seqnum
-  centers <- dgSEQNUM_to_GEO(dggs.10, dmax24$grid.id.10km)
-  dmax24$lon.10km <- centers$lon_deg
-  dmax24$lat.10km <- centers$lat_deg
+  centers_10 <- dgSEQNUM_to_GEO(dggs.10, dmax24$grid.id.10km)
+  dmax24$lon.10km <- centers_10$lon_deg
+  dmax24$lat.10km <- centers_10$lat_deg
   
   # Spatial annotation 1km
   cell_info_1 <- dgGEO_to_SEQNUM(dggs.1, mean.coord$mean.x, mean.coord$mean.y)
   dmax24$grid.id.1km <- cell_info_1$seqnum
-  centers <- dgSEQNUM_to_GEO(dggs.1, dmax24$grid.id.1km)
-  dmax24$lon.1km <- centers$lon_deg
-  dmax24$lat.1km <- centers$lat_deg
+  centers_1 <- dgSEQNUM_to_GEO(dggs.1, dmax24$grid.id.1km)
+  dmax24$lon.1km <- centers_1$lon_deg
+  dmax24$lat.1km <- centers_1$lat_deg
   
   return(dmax24)
   
+  rm(moveObjSplitTime);rm(maxNetDispL);rm(maxNetDisp)
+  rm(mean.coord);rm(locs1h.sf);rm(cell_info_1);rm(cell_info_10);
+  rm(centers_10);rm(centers_1)
 }
-
+}
 
 # ----summarize dmax24h at individual level
 f_sum.ind.dmax24h<-function(x)
@@ -120,7 +124,6 @@ f_sum.monthly.ind.dmax24h<-function(x)
     
     # sample size per individual-month
     n.dmax24h.days <- as.numeric(tapply(x$ymd, id_ym, length))
-    n.dmax7d.weeks<-as.numeric(with(x, tapply(x$ymd,individual_id, length)))
     
     # 24hr Displacement
     dmax24h.mean<-as.numeric(with(x, tapply(x$dmax24h+0.001,id_ym, mean, na.rm=T)))
