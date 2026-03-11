@@ -62,13 +62,14 @@ if(is.null(dmax7d)) NULL else {
   centers_1 <- dgSEQNUM_to_GEO(dggs.1, dmax24$grid.id.1km)
   dmax24$lon.1km <- centers_1$lon_deg
   dmax24$lat.1km <- centers_1$lat_deg
-  
-  return(dmax24)
-  
-  rm(moveObjSplitTime);rm(maxNetDispL);rm(maxNetDisp)
-  rm(mean.coord);rm(locs1h.sf);rm(cell_info_1);rm(cell_info_10);
-  rm(centers_10);rm(centers_1)
 }
+
+return(dmax24)
+
+rm(moveObjSplitTime);rm(maxNetDispL);rm(maxNetDisp)
+rm(mean.coord);rm(locs1h.sf);rm(cell_info_1);rm(cell_info_10);
+rm(centers_10);rm(centers_1)
+
 }
 
 # ----summarize dmax24h at individual level

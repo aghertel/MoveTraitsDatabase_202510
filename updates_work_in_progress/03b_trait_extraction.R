@@ -22,9 +22,14 @@ pathTOfolder2 <- "./updates_work_in_progress/DATA/"
 dir.create(paste0(pathTOfolder2,"5.MB_indv_traitsum"))
 pthtraitsum <- paste0(pathTOfolder2,"5.MB_indv_traitsum/")
 
+#dir for individual monthly summaries
+pathTOfolder2 <- "./updates_work_in_progress/DATA/"
+dir.create(paste0(pathTOfolder2,"6.MB_indv_monthly_traitsum"))
+pthtraitsummonthly <- paste0(pathTOfolder2,"6.MB_indv_monthly_traitsum/")
+
 #dir for individual underlying traits
-dir.create(paste0(pathTOfolder2,"6.MB_indv_trait"))
-pthtrait <- paste0(pathTOfolder2,"6.MB_indv_trait/")
+dir.create(paste0(pathTOfolder2,"7.MB_indv_trait"))
+pthtrait <- paste0(pathTOfolder2,"7.MB_indv_trait/")
 
 #spatial grid
 dggs.100    <- dgconstruct(projection = "ISEA", area = 10000, resround='nearest')
@@ -42,6 +47,7 @@ referenceTableStudiesUsed <- referenceTableStudies[referenceTableStudies$exclude
 
 flsMV <- flsMV[flsMV %in% referenceTableStudiesUsed$fileName]
 
+# load data of one individual and apply all trait extraction functions its tracking data 
 #lapply(flsMV, function(indPth)
 #  {
 
@@ -50,34 +56,6 @@ flsMV <- flsMV[flsMV %in% referenceTableStudiesUsed$fileName]
 # example panthera leo - 3809257699_3809647332.rds
 
   animlocs.1hourly <- readRDS(paste0(pthamt1h,"3809257699_3809647332.rds")) 
-
-  #coordinates for individual summaries
-  cell_info.100 <- dgGEO_to_SEQNUM(dggs.100, animlocs.1hourly$x_, animlocs.1hourly$y_)
-  grid.id.100km <- unique(cell_info.100$seqnum)
-  lon.100km <- dgSEQNUM_to_GEO(dggs.100, grid.id.100km)$lon_deg
-  lat.100km <- dgSEQNUM_to_GEO(dggs.100, grid.id.100km)$lat_deg
-
-  cell_info.10 <- dgGEO_to_SEQNUM(dggs.10, animlocs.1hourly$x_, animlocs.1hourly$y_)
-  grid.id.10km <- unique(cell_info.10$seqnum)
-  lon.10km <- dgSEQNUM_to_GEO(dggs.10, grid.id.10km)$lon_deg
-  lat.10km <- dgSEQNUM_to_GEO(dggs.10, grid.id.10km)$lat_deg
-
-  
-  #coordinates for monthly individual summaries
-  id_monthly <- animlocs.1hourly |> 
-    mutate(month = month(t_),
-           year = year(t_),
-           month_year = paste(month,year,sep="_"))
-  
-  cell_info.100 <- dgGEO_to_SEQNUM(dggs.100, animlocs.1hourly$x_, animlocs.1hourly$y_)
-  id_monthly$grid.id.100km <- cell_info.100$seqnum
-  id_monthly_100km <- id_monthly |> 
-    distinct(month_year,grid.id.100km,.keep_all = TRUE)
-  
-  cell_info.10 <- dgGEO_to_SEQNUM(dggs.10, animlocs.1hourly$x_, animlocs.1hourly$y_)
-  id_monthly$grid.id.10km <- cell_info.10$seqnum
-  id_monthly_10km <- id_monthly |> 
-    distinct(month_year,grid.id.10km,.keep_all = TRUE)
   
 ## ----Resample data-------------------------------------------------------------
 #Resample data to 24h, 7 week time scales using amt
@@ -90,32 +68,7 @@ animlocs.weekly <- animlocs.1hourly |>
   track_resample(rate = hours(24*7),
                  tolerance = minutes(60*24))
 
-# data_resampled <- animlocs.1hourly %>%
-#   tidyr::nest(data = -individual_id) %>% 
-#   dplyr::select(-data) %>% # just a quick trick to keep things flowing.
-#   left_join(., animlocs.1hourly[!duplicated(animlocs.1hourly$individual_id),
-#                         c("study_id","individual_id")], 
-#             by = c("individual_id" = "individual_id")) %>% 
-#   # 1 hourly
-#   left_join(.,  animlocs.1hourly %>%
-#               mutate(id = individual_id) %>% 
-#               tidyr::nest(data = -individual_id), 
-#             by = c("individual_id" = "individual_id")) %>% 
-#   dplyr::rename(animlocs.1hourly = data) %>% 
-#   # daily 
-#   left_join(.,  animlocs.daily %>%
-#             mutate(id = individual_id) %>% 
-#             tidyr::nest(data = -individual_id),
-#           by = c("individual_id" = "individual_id")) %>%
-#   dplyr::rename(animlocs.daily = data) %>%
-#   # weekly 
-#   left_join(.,  animlocs.weekly %>%
-#             mutate(id = individual_id) %>% 
-#             tidyr::nest(data = -individual_id),
-#           by = c("individual_id" = "individual_id")) %>%
-#   dplyr::rename(animlocs.weekly = data)
-
-## ----Movement metrics-------------------------------------------------------------
+## ----Displacement traits-------------------------------------------------------------
 
 ## ----1h displacement-------------------------------------------------------------
 d1h <- calc_d1h(animlocs.1hourly, dggs.10, dggs.1)
@@ -138,234 +91,33 @@ sum.ind.dmax7d <- f_sum.ind.dmax7d(dmax7d)
 sum.monthly.ind.dmax7d <- f_sum.monthly.ind.dmax7d(dmax7d)
 
 ## ----Maximum annual displacement distance-------------------------------------------------------------
+dmax12m <- calc_dmax12m(animlocs.weekly, dggs.10, dggs.1)
+sum.ind.dmax12m <- f_sum.ind.dmax12m(dmax12m)
+#sum.monthly.ind.dmax12m<- f_sum.monthly.ind.dmax12m(dmax12m)
+## ???
 
-
-## ----Range sizes - MCPs-------------------------------------------------------------
+## ----Range size traits-------------------------------------------------------------
 ## ----Daily MCP-------------------------------------------------------------
-#' Daily range used based on hourly relocations including only individuals with at least 12 locations on a given day.
-dat.mcp.daily <- flatten(data_resampled[,"animlocs.1hourly"]) %>% bind_rows() %>% 
-  tibble() %>% mutate(ymd = as.character(format(as.Date(t_), "%Y-%m-%d")))  %>%
-  filter(!is.na(x_)) %>% filter(!is.na(y_)) %>% 
-  mutate(id.day = paste(id,ymd,sep=".")) %>% group_by(id.day) %>% filter(n() > 12) %>% ungroup() %>% 
-  dplyr::select(x_,y_,id.day) 
-
-      mean.coord <- dat.mcp.daily |> group_by(id.day) |> 
-        mutate(mean.x = mean(x_, na.rm=T),
-               mean.y = mean(y_, na.rm=T)) |> 
-        dplyr::select(id.day, mean.x, mean.y) |> distinct()
-
-      tryCatch({
-  coordinates(dat.mcp.daily) <- c("x_","y_")
-  proj4string(dat.mcp.daily) <- CRS("EPSG:4326")
-  
-  # Bonne equal area projection - https://spatialreference.org/ref/esri/54024/
-  # "+proj=bonne +lat_1=60 +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs +type=crs"
-  # Mollweide projection
-  dat.mcp.daily <- spTransform(dat.mcp.daily,sp::CRS("+proj=moll +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs +type=crs"))
-      }, error = function(e) {NA})
-      
-mcp.daily <- 
-  if(nrow(dat.mcp.daily)==0) NULL else {
-  mcp(dat.mcp.daily, percent = 95, unout = c( "m2")) %>% data.frame() %>% 
-  left_join(mean.coord, by = c("id" = "id.day")) |> 
-  mutate(ymd = str_split(id, '[.]', simplify = TRUE)[,2],
-         individual_id = str_split(id, '[.]', simplify = TRUE)[,1]) %>% 
-  #dplyr::select(individual_id,ymd,area, mean.x, mean.y)|> 
-  filter(!is.na(area)) }
-
-if(is.null(mcp.daily)) NULL else {
-  # Spatial annotation 10km
-  mean.coord$grid.id.10km <- dgGEO_to_SEQNUM(dggs.10, mean.coord$mean.x, mean.coord$mean.y)$seqnum
-  mcp.daily <- mcp.daily |> left_join(mean.coord[,c("id.day","grid.id.10km")], by = c("id" = "id.day"))
-  centers <- dgSEQNUM_to_GEO(dggs.10, mcp.daily$grid.id.10km)
-  mcp.daily$lon.10km <- centers$lon_deg
-  mcp.daily$lat.10km <- centers$lat_deg
-  rm(centers)
-  
-  # Spatial annotation 1km
-  mean.coord$grid.id.1km <- dgGEO_to_SEQNUM(dggs.1, mean.coord$mean.x, mean.coord$mean.y)$seqnum
-  mcp.daily <- mcp.daily |> left_join(mean.coord[,c("id.day","grid.id.1km")], by = c("id" = "id.day"))
-  centers <- dgSEQNUM_to_GEO(dggs.1, mcp.daily$grid.id.1km)
-  mcp.daily$lon.1km <- centers$lon_deg
-  mcp.daily$lat.1km <- centers$lat_deg
-  rm(centers)
-  
-  mcp.daily <- mcp.daily |> 
-  dplyr::select(individual_id,ymd,area, mean.x, mean.y,
-                grid.id.10km, lon.10km,  lat.10km, 
-                grid.id.1km,  lon.1km,   lat.1km) 
-}
-
-
-rm(mean.coord);rm(dat.mcp.daily)
+mcp24h <- calc_mcp24h(animlocs.1hourly, dggs.10, dggs.1)
+sum.ind.mcp24h <- f_sum.ind.mcp24h(mcp24h)
+sum.monthly.ind.mcp24h <- f_sum.monthly.ind.mcp24h(mcp24h)
 
 ## ----Weekly MCP-------------------------------------------------------------
-dat.mcp.weekly <- flatten(data_resampled[,"animlocs.1hourly"]) %>% bind_rows() %>%  tibble() %>% 
- mutate(week = as.numeric(strftime(t_,format="%W")), 
-        year = as.numeric(strftime(t_,format="%Y")),
-        year_week = paste(year,week, sep="_")) %>% 
-  mutate(id.week = paste(id,year_week,sep=".")) %>% 
-  filter(!is.na(x_)) %>% filter(!is.na(y_)) %>%
-  group_by(id.week) %>% filter(n() > 84) %>% ungroup() %>% 
-  dplyr::select(x_,y_,id.week) 
-
-      mean.coord <- dat.mcp.weekly |> group_by(id.week) |> 
-        mutate(mean.x = mean(x_, na.rm=T),
-               mean.y = mean(y_, na.rm=T)) |> 
-        dplyr::select(id.week, mean.x, mean.y) |> distinct()
-
-      tryCatch({
-coordinates(dat.mcp.weekly) <- c("x_","y_")
-proj4string(dat.mcp.weekly) <- CRS("EPSG:4326")
-dat.mcp.weekly <- spTransform(dat.mcp.weekly,
-                              sp::CRS("+proj=moll +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs +type=crs"))
-      }, error = function(e) {NA})
-      
-mcp.weekly <- 
-  if(nrow(dat.mcp.weekly)==0) NULL else {
-  mcp(dat.mcp.weekly, percent = 95, unout = c("m2")) %>% data.frame() %>%
-  left_join(mean.coord, by = c("id" = "id.week")) |> 
-  mutate(week = as.numeric(stringr::str_extract(id, "(\\d+$)")),
-         year_week = stringr::str_extract(id, "[^.]*$"),
-         individual_id = str_extract(id, "[^.]+")) |> 
-  filter(!is.na(area)) }
-
-if(is.null(mcp.weekly)) NULL else {
-  # Spatial annotation 10km
-  mean.coord$grid.id.10km <- dgGEO_to_SEQNUM(dggs.10, mean.coord$mean.x, mean.coord$mean.y)$seqnum
-  mcp.weekly <- mcp.weekly |> left_join(mean.coord[,c("id.week","grid.id.10km")], by = c("id" = "id.week"))
-  centers <- dgSEQNUM_to_GEO(dggs.10, mcp.weekly$grid.id.10km)
-  mcp.weekly$lon.10km <- centers$lon_deg
-  mcp.weekly$lat.10km <- centers$lat_deg
-  rm(centers)
-  
-  # Spatial annotation 1km
-  mean.coord$grid.id.1km <- dgGEO_to_SEQNUM(dggs.1, mean.coord$mean.x, mean.coord$mean.y)$seqnum
-  mcp.weekly <- mcp.weekly |> left_join(mean.coord[,c("id.week","grid.id.1km")], by = c("id" = "id.week"))
-  centers <- dgSEQNUM_to_GEO(dggs.1, mcp.weekly$grid.id.1km)
-  mcp.weekly$lon.1km <- centers$lon_deg
-  mcp.weekly$lat.1km <- centers$lat_deg
-  rm(centers)
-  
-  mcp.weekly <- mcp.weekly |> 
-    dplyr::select(individual_id, week, year_week, area, mean.x, mean.y, 
-                  grid.id.10km, lon.10km,  lat.10km, 
-                  grid.id.1km,  lon.1km,   lat.1km)
-}
-
-rm(dat.mcp.weekly);rm(mean.coord)
+mcp7d <- calc_mcp7d(animlocs.1hourly, dggs.10, dggs.1)
+sum.ind.mcp7d <- f_sum.ind.mcp7d(mcp7d)
+sum.monthly.ind.mcp7d <- f_sum.monthly.ind.mcp24h(mcp7d)
 
 ## ----Monthly MCP-------------------------------------------------------------
-dat.mcp.monthly <- flatten(data_resampled[,"animlocs.daily"]) %>% bind_rows() %>% 
-  tibble() %>% 
-  mutate(month = as.numeric(strftime(t_,format="%m")), 
-         year = as.numeric(strftime(t_,format="%Y"))) %>% 
-  mutate(year_month = paste(year,month,sep="_")) |> 
-  mutate(id.month = paste(id,year_month,sep=".")) %>% 
-  filter(!is.na(x_)) %>% filter(!is.na(y_)) %>% group_by(id.month) %>% 
-  filter(n() > 14) %>% ungroup() %>% dplyr::select(x_,y_,id.month) 
-
-      mean.coord <- dat.mcp.monthly |> group_by(id.month) |> 
-        mutate(mean.x = mean(x_, na.rm=T),
-               mean.y = mean(y_, na.rm=T)) |> 
-        dplyr::select(id.month, mean.x, mean.y) |> distinct()
-
-      tryCatch({
-    coordinates(dat.mcp.monthly) <- c("x_","y_")
-    proj4string(dat.mcp.monthly) <- CRS("EPSG:4326")
-    dat.mcp.monthly <- spTransform(dat.mcp.monthly,sp::CRS("+proj=moll +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs +type=crs"))
-    }, error = function(e) {NA})
-
-mcp.monthly <- 
-  if(nrow(dat.mcp.monthly)==0) NULL else {
-  mcp(dat.mcp.monthly, percent = 95, unout = c("m2")) %>% data.frame() %>%   
-      left_join(mean.coord, by = c("id" = "id.month")) |> 
-      mutate(month = as.numeric(stringr::str_extract(id, "(\\d+$)")),
-         year_month = stringr::str_extract(id, "[^.]*$"),
-         individual_id = str_extract(id, "[^.]+")) %>% 
-  #dplyr::select(individual_id,month,year_month,area, mean.x, mean.y)|> 
-  filter(!is.na(area)) }
-
-if(is.null(mcp.monthly)) NULL else {
-  # Spatial annotation 10km
-  mean.coord$grid.id.10km <- dgGEO_to_SEQNUM(dggs.10, mean.coord$mean.x, mean.coord$mean.y)$seqnum
-  mcp.monthly <- mcp.monthly |> left_join(mean.coord[,c("id.month","grid.id.10km")], by = c("id" = "id.month"))
-  centers <- dgSEQNUM_to_GEO(dggs.10, mcp.monthly$grid.id.10km)
-  mcp.monthly$lon.10km <- centers$lon_deg
-  mcp.monthly$lat.10km <- centers$lat_deg
-  rm(centers)
-  
-  # Spatial annotation 1km
-  mean.coord$grid.id.1km <- dgGEO_to_SEQNUM(dggs.1, mean.coord$mean.x, mean.coord$mean.y)$seqnum
-  mcp.monthly <- mcp.monthly |> left_join(mean.coord[,c("id.month","grid.id.1km")], by = c("id" = "id.month"))
-  centers <- dgSEQNUM_to_GEO(dggs.1, mcp.monthly$grid.id.1km)
-  mcp.monthly$lon.1km <- centers$lon_deg
-  mcp.monthly$lat.1km <- centers$lat_deg
-  rm(centers)
-  
-  mcp.monthly <- mcp.monthly |> 
-    dplyr::select(individual_id,month,year_month,area, mean.x, mean.y, 
-                  grid.id.10km, lon.10km,  lat.10km, 
-                  grid.id.1km,  lon.1km,   lat.1km)
-}
-
-
-rm(dat.mcp.monthly);rm(mean.coord)
+mcp1m <- calc_mcp1m(animlocs.daily, dggs.10, dggs.1)
+sum.ind.mcp1m <- f_sum.ind.mcp1m(mcp1m)
+sum.monthly.ind.mcp1m <- mcp1m[,1:4] |> 
+  rename(mcp1m = area) |> 
+  mutate(year = as.numeric(substr(year_month, 1, 4))) |> 
+  dplyr::select(individual_id,month,year,mcp1m)
 
 ## ----Annual MCP-------------------------------------------------------------
-dat.mcp.annual <- flatten(data_resampled[,"animlocs.weekly"]) %>% bind_rows() %>% 
-  tibble() |>   mutate(year = as.numeric(strftime(t_,format="%Y"))) %>% 
-  mutate(id.year = paste(id,year,sep=".")) %>% 
-  filter(!is.na(x_)) %>% filter(!is.na(y_)) %>% group_by(id.year) %>% 
-  filter(n() > 36) %>% ungroup() %>% dplyr::select(x_,y_,id.year) 
-
-      mean.coord <- dat.mcp.annual |> group_by(id.year) |> 
-        mutate(mean.x = mean(x_, na.rm=T),
-               mean.y = mean(y_, na.rm=T)) |> 
-        dplyr::select(id.year, mean.x, mean.y) |> distinct()
-      
-      tryCatch({
-    coordinates(dat.mcp.annual) <- c("x_","y_")
-    proj4string(dat.mcp.annual) <- CRS("EPSG:4326")
-    dat.mcp.annual <- spTransform(dat.mcp.annual,sp::CRS("+proj=moll +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs +type=crs"))
-    }, error = function(e) {NA})
-
-mcp.annual <- 
-  if(nrow(dat.mcp.annual)==0) NULL else {
-  mcp(dat.mcp.annual, percent = 95, unout = c("m2")) %>% data.frame() %>% 
-  left_join(mean.coord, by = c("id" = "id.year")) |> 
-  mutate(id.year = id,
-         year = stringr::str_extract(id, "[^.]*$"),
-         individual_id = str_extract(id, "[^.]+")) %>% 
-  #dplyr::select(individual_id, id.year, year,area, mean.x, mean.y)|> 
-  filter(!is.na(area)) 
-  }
-
-if(is.null(mcp.annual)) NULL else {
-  # Spatial annotation 10km
-  mean.coord$grid.id.10km <- dgGEO_to_SEQNUM(dggs.10, mean.coord$mean.x, mean.coord$mean.y)$seqnum
-  mcp.annual <- mcp.annual |> left_join(mean.coord[,c("id.year","grid.id.10km")], by = c("id" = "id.year"))
-  centers <- dgSEQNUM_to_GEO(dggs.10, mcp.annual$grid.id.10km)
-  mcp.annual$lon.10km <- centers$lon_deg
-  mcp.annual$lat.10km <- centers$lat_deg
-  rm(centers)
-  
-  # Spatial annotation 1km
-  mean.coord$grid.id.1km <- dgGEO_to_SEQNUM(dggs.1, mean.coord$mean.x, mean.coord$mean.y)$seqnum
-  mcp.annual <- mcp.annual |> left_join(mean.coord[,c("id.year","grid.id.1km")], by = c("id" = "id.year"))
-  centers <- dgSEQNUM_to_GEO(dggs.1, mcp.annual$grid.id.1km)
-  mcp.annual$lon.1km <- centers$lon_deg
-  mcp.annual$lat.1km <- centers$lat_deg
-  rm(centers)
-  
-  mcp.annual <- mcp.annual |> 
-    dplyr::select(individual_id,id.year, year, area, mean.x, mean.y, 
-                  grid.id.10km, lon.10km,  lat.10km, 
-                  grid.id.1km,  lon.1km,   lat.1km)
-}
-
-
-rm(dat.mcp.annual);rm(mean.coord)
+mcp12m <- calc_mcp12m(animlocs.weekly, dggs.10, dggs.1)
+sum.ind.mcp12m <- f_sum.ind.mcp12m(mcp12m)
 
 ## ----Intensity of use-------------------------------------------------------------
 
@@ -571,125 +323,8 @@ if(is.null(DI)) NULL else {
 ### !!! ###
 
 
-## ----function to summarize 1d MCP--------------------
-FSumMCP1d<-function(x)
-  {
-  # Check if the input is NULL
-  if (is.null(x)) {
-    # Create a placeholder dataframe with NA values
-    dats <- data.frame(individual_id = NA,n.mcp24h.days = NA,
-                       mcp24h.mean = NA,mcp24h.median = NA,mcp24h.cv = NA,mcp24h.95 = NA,mcp24h.05 = NA)
-  } else {
-    
-  individual_id <- with(x, tapply(as.character(x$individual_id),individual_id, unique))
-  
-  # Get sample size per indivindividual_idual
-  n.mcp24h.days<-as.numeric(with(x, tapply(x$individual_id,individual_id, length)))
-  
-  # 24MCP Displacement
-  mcp24h.mean<-as.numeric(with(x, tapply(x$area+0.001,individual_id, mean, na.rm=T)))
-  mcp24h.median<-as.numeric(with(x, tapply(x$area+0.001,individual_id, median, na.rm=T)))
-  mcp24h.cv<-as.numeric(with(x, tapply(x$area+0.001,individual_id, function(x) sd(x, na.rm=T) / mean(x, na.rm=T))))
-  mcp24h.95<-as.numeric(with(x, tapply(x$area+0.001,individual_id, quantile,.95, na.rm=T)))
-  mcp24h.05<-as.numeric(with(x, tapply(x$area+0.001,individual_id, quantile,.05, na.rm=T)))
-  
-  # build dataframe
-  dats<-data.frame(individual_id,n.mcp24h.days,
-                   mcp24h.mean,mcp24h.median,mcp24h.cv,mcp24h.95,mcp24h.05)
-  
-  return(dats)
-}
-}
-MCP24h <- FSumMCP1d(mcp.daily)
 
-## ----function to summarize 7d MCP--------------------
-FSumMCP7d<-function(x)
-  {
-  # Check if the input is NULL
-  if (is.null(x)) {
-    # Create a placeholder dataframe with NA values
-    dats <- data.frame(individual_id = NA,n.mcp7d.weeks = NA,
-                       mcp7d.mean = NA,mcp7d.median = NA,mcp7d.cv = NA,mcp7d.95 = NA,mcp7d.05 = NA)
-  } else {
-    
-  individual_id <- with(x, tapply(as.character(x$individual_id),individual_id, unique))
-  
-  # Get sample size per indivindividual_idual
-  n.mcp7d.weeks<-as.numeric(with(x, tapply(x$year_week,individual_id, length)))
-  
-  # 24mcp Displacement
-  mcp7d.mean<-as.numeric(with(x, tapply(x$area+0.001,individual_id, mean, na.rm=T)))
-  mcp7d.median<-as.numeric(with(x, tapply(x$area+0.001,individual_id, median, na.rm=T)))
-  mcp7d.cv<-as.numeric(with(x, tapply(x$area+0.001,individual_id, function(x) sd(x, na.rm=T) / mean(x, na.rm=T))))
-  mcp7d.95<-as.numeric(with(x, tapply(x$area+0.001,individual_id, quantile,.95, na.rm=T)))
-  mcp7d.05<-as.numeric(with(x, tapply(x$area+0.001,individual_id, quantile,.05, na.rm=T)))
-  
-  # build dataframe
-  dats<-data.frame(individual_id,n.mcp7d.weeks,
-                   mcp7d.mean,mcp7d.median,mcp7d.cv,mcp7d.95,mcp7d.05)
-  
-  return(dats)
-}
-}
 
-MCP7d <- FSumMCP7d(mcp.weekly)
-
-## ----function to summarize 1m MCP--------------------
-FSumMCP1m<-function(x)
-  {
-  # Check if the input is NULL
-  if (is.null(x)) {
-    # Create a placeholder dataframe with NA values
-    dats <- data.frame(individual_id = NA,n.mcp1m.months = NA,
-                       mcp1m.mean = NA,mcp1m.median = NA,mcp1m.cv = NA,mcp1m.95 = NA,mcp1m.05 = NA)
-  } else {
-    
-  individual_id <- with(x, tapply(as.character(x$individual_id),individual_id, unique))
-
-  n.mcp1m.months<-as.numeric(with(x, tapply(x$year_month,individual_id, length)))
-  
-  mcp1m.mean<-as.numeric(with(x, tapply(x$area+0.001,individual_id, mean, na.rm=T)))
-  mcp1m.median<-as.numeric(with(x, tapply(x$area+0.001,individual_id, median, na.rm=T)))
-  mcp1m.cv<-as.numeric(with(x, tapply(x$area+0.001,individual_id, function(x) sd(x, na.rm=T) / mean(x, na.rm=T))))
-  mcp1m.95<-as.numeric(with(x, tapply(x$area+0.001,individual_id, quantile,.95, na.rm=T)))
-  mcp1m.05<-as.numeric(with(x, tapply(x$area+0.001,individual_id, quantile,.05, na.rm=T)))
-  
-  dats<-data.frame(individual_id,n.mcp1m.months,
-                   mcp1m.mean,mcp1m.median,mcp1m.cv,mcp1m.95,mcp1m.05)
-  
-  return(dats)
-}
-}
-
-MCP1m <- FSumMCP1m(mcp.monthly)
-
-## ----function to summarize 12m MCP--------------------
-FSumMCP12m<-function(x)
-  {
-  # Check if the input is NULL
-  if (is.null(x)) {
-    # Create a placeholder dataframe with NA values
-    dats <- data.frame(individual_id = NA,n.mcp12m.years = NA,
-                       mcp12m.mean = NA,mcp12m.median = NA,mcp12m.cv = NA,mcp12m.95 = NA,mcp12m.05 = NA)
-  } else {
-    
-  individual_id <- with(x, tapply(as.character(x$individual_id),individual_id, unique))
-
-  n.mcp12m.years<-as.numeric(with(x, tapply(x$year,individual_id, length)))
-  
-  mcp12m.mean<-as.numeric(with(x, tapply(x$area+0.001,individual_id, mean, na.rm=T)))
-  mcp12m.median<-as.numeric(with(x, tapply(x$area+0.001,individual_id, median, na.rm=T)))
-  mcp12m.cv<-as.numeric(with(x, tapply(x$area+0.001,individual_id, function(x) sd(x, na.rm=T) / mean(x, na.rm=T))))
-  mcp12m.95<-as.numeric(with(x, tapply(x$area+0.001,individual_id, quantile,.95, na.rm=T)))
-  mcp12m.05<-as.numeric(with(x, tapply(x$area+0.001,individual_id, quantile,.05, na.rm=T)))
-  
-  dats<-data.frame(individual_id,n.mcp12m.years,
-                   mcp12m.mean,mcp12m.median,mcp12m.cv,mcp12m.95,mcp12m.05)
-  
-  return(dats)
-  }}
-
-MCP12m <- FSumMCP12m(mcp.annual)
 
 ## ----function to summarize IoU24h--------------------
 FSumIOU24h<-function(x)
@@ -818,7 +453,7 @@ FSumDI<-function(x)
 DI.12 <- FSumDI(DI)
 
 ## ----Build database with summary values--------------------
-#' ## PROBLEM - this does not work when some metrics could not be computed
+#cbind individual summaries of all traits 
 MoveTrait.v0.1 <- bind_cols(Displ1h, 
                           bind_cols(Displ24h[,2:length(Displ24h)], 
                           bind_cols(MaxDispl24h[,2:length(MaxDispl24h)], 
@@ -833,7 +468,7 @@ MoveTrait.v0.1 <- bind_cols(Displ1h,
                           bind_cols(IOU12m[,2:length(IOU12m)], DI.12[,2:length(DI.12)])))))))))))) %>% 
   filter(if_any(everything(), ~ !is.na(.)))
 
-
+#mean coordinates for individual summaries
 library(bit64)
 movedata2 <- animlocs.1hourly %>% 
   mutate(study_id = as.integer64(study_id),
@@ -845,9 +480,21 @@ movedata2 <- animlocs.1hourly %>%
   mutate(individual_id = as.character(individual_id)) %>% 
   distinct()
 
+#gridded coordinates for individual summaries
+cell_info.100 <- dgGEO_to_SEQNUM(dggs.100, animlocs.1hourly$x_, animlocs.1hourly$y_)
+grid.id.100km <- unique(cell_info.100$seqnum)
+lon.100km <- dgSEQNUM_to_GEO(dggs.100, grid.id.100km)$lon_deg
+lat.100km <- dgSEQNUM_to_GEO(dggs.100, grid.id.100km)$lat_deg
+
+cell_info.10 <- dgGEO_to_SEQNUM(dggs.10, animlocs.1hourly$x_, animlocs.1hourly$y_)
+grid.id.10km <- unique(cell_info.10$seqnum)
+lon.10km <- dgSEQNUM_to_GEO(dggs.10, grid.id.10km)$lon_deg
+lat.10km <- dgSEQNUM_to_GEO(dggs.10, grid.id.10km)$lat_deg
+
 movedata2$grid.id.100km <- paste(grid.id.100km, collapse = ";")
 movedata2$grid.id.10km <- paste(grid.id.10km, collapse = ";")
 
+# join database
 MoveTrait.v0.1 <- 
   if (is.null(MoveTrait.v0.1) | nrow(MoveTrait.v0.1) == 0) NULL else {
     movedata2 %>% 
@@ -856,6 +503,24 @@ MoveTrait.v0.1 <-
 
 ## ----Save database with summaries--------------------
 saveRDS(MoveTrait.v0.1, file=paste0(pthtraitsum,"3809257699_3809647332.rds"))
+
+# #coordinates for monthly individual summaries
+# id_monthly <- animlocs.1hourly |> 
+#   mutate(month = month(t_),
+#          year = year(t_),
+#          month_year = paste(month,year,sep="_"))
+# 
+# cell_info.100 <- dgGEO_to_SEQNUM(dggs.100, animlocs.1hourly$x_, animlocs.1hourly$y_)
+# id_monthly$grid.id.100km <- cell_info.100$seqnum
+# id_monthly_100km <- id_monthly |> 
+#   distinct(month_year,grid.id.100km,.keep_all = TRUE)
+# 
+# cell_info.10 <- dgGEO_to_SEQNUM(dggs.10, animlocs.1hourly$x_, animlocs.1hourly$y_)
+# id_monthly$grid.id.10km <- cell_info.10$seqnum
+# id_monthly_10km <- id_monthly |> 
+#   distinct(month_year,grid.id.10km,.keep_all = TRUE)
+
+#pthtraitsummonthly
 
 ## ----Build full database including raw metrics data--------------------
 
