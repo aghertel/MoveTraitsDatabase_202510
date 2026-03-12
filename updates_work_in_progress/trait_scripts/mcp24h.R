@@ -98,7 +98,7 @@ f_sum.monthly.ind.mcp24h<-function(x)
 {
   # Check if the input is NULL
   if (is.null(x)) {
-    return(data.frame(individual_id = NA,n.mcp24h.days = NA,
+    return(data.frame(individual_id = NA,year=NA,month=NA,n.mcp24h.days = NA,
                       mcp24h.mean = NA,mcp24h.median = NA,mcp24h.cv = NA,mcp24h.95 = NA,mcp24h.05 = NA))
   } 
   
@@ -120,6 +120,9 @@ f_sum.monthly.ind.mcp24h<-function(x)
   mcp24h.cv <- as.numeric(with(x, tapply(x$area+0.001,id_ym, function(x) sd(x, na.rm=T) / mean(x, na.rm=T))))
   mcp24h.95 <- as.numeric(with(x, tapply(x$area+0.001,id_ym, quantile,.95, na.rm=T)))
   mcp24h.05 <- as.numeric(with(x, tapply(x$area+0.001,id_ym, quantile,.05, na.rm=T)))
+  
+  year  <- as.numeric(sub(".*\\.(\\d{4})-\\d{2}$", "\\1", unique(id_ym)))
+  month <- as.numeric(sub(".*\\.\\d{4}-(\\d{2})$", "\\1", unique(id_ym)))
   
   # build dataframe
   dats<-data.frame(individual_id,year,month,n.mcp24h.days,

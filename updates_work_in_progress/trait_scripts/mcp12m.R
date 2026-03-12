@@ -83,4 +83,3 @@ f_sum.ind.mcp12m<-function(x)
     
     return(dats)
   }}
-

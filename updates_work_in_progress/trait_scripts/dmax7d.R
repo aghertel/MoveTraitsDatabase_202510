@@ -45,7 +45,7 @@ dmax7d <-
       dplyr::select(individual_id,week, year_week,dmax7d,mean.x, mean.y) }
 
 # Final NULL checks
-if (is.null(dmax24) || nrow(dmax24) == 0) return(NULL)
+if (is.null(dmax7d) || nrow(dmax7d) == 0) return(NULL)
 
 if(is.null(dmax7d)) NULL else {
   # Spatial annotation 10km

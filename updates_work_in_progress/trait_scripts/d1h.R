@@ -104,10 +104,8 @@ f_sum.monthly.ind.d1h <- function(x) {
   d1h.95     <- as.numeric(tapply(x$d1h + 0.001, id_ym, quantile, 0.95, na.rm = TRUE))
   d1h.05     <- as.numeric(tapply(x$d1h + 0.001, id_ym, quantile, 0.05, na.rm = TRUE))
   
-  ym <- as.character(unlist(ym_grp))
-  ym_split <- do.call(rbind, strsplit(ym, "-", fixed = TRUE))
-  year  <- as.integer(ym_split[, 1])
-  month <- as.integer(ym_split[, 2])
+  year  <- as.numeric(sub(".*\\.(\\d{4})-\\d{2}$", "\\1", unique(id_ym)))
+  month <- as.numeric(sub(".*\\.\\d{4}-(\\d{2})$", "\\1", unique(id_ym)))
   
   data.frame(
     individual_id = unlist(individual_id),

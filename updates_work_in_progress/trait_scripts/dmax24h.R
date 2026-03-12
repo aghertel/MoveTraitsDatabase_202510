@@ -48,7 +48,7 @@ dmax24 <-
   # Final NULL checks
   if (is.null(dmax24) || nrow(dmax24) == 0) return(NULL)
  
-if(is.null(dmax7d)) NULL else {
+if(is.null(dmax24)) NULL else {
   # Spatial annotation 10km
   cell_info_10 <- dgGEO_to_SEQNUM(dggs.10, mean.coord$mean.x, mean.coord$mean.y)
   dmax24$grid.id.10km <- cell_info_10$seqnum

@@ -92,7 +92,7 @@ f_sum.ind.mcp7d<-function(x)
 
 
 ## ----summarize mcp7d at monthly individual level---------
-f_sum.monthly.ind.mcp24h<-function(x)
+f_sum.monthly.ind.mcp7d<-function(x)
 {
   # Check if the input is NULL
   if (is.null(x)) {
@@ -101,14 +101,13 @@ f_sum.monthly.ind.mcp24h<-function(x)
                        mcp7d.mean = NA,mcp7d.median = NA,mcp7d.cv = NA,mcp7d.95 = NA,mcp7d.05 = NA)
   } else {
     
-    
     # derive month and year from t_
-    y <- as.numeric(substr(x$year_week, 1, 4))  
+    year <- as.numeric(substr(x$year_week, 1, 4))  
     
     string_iso <- paste(y, sprintf("W%02d", as.numeric(x$week)), 1, sep="-")
     date <- ISOweek2date(string_iso)
-    m <- format(date, "%m")
-    ym <- paste(y,m,sep="-")
+    month <- format(date, "%m")
+    ym <- paste(year,month,sep="-")
     
     # group index: individual x month
     id_ym <- interaction(x$individual_id, ym, drop = TRUE)
@@ -125,6 +124,9 @@ f_sum.monthly.ind.mcp24h<-function(x)
     mcp7d.cv<-as.numeric(with(x, tapply(x$area+0.001,id_ym, function(x) sd(x, na.rm=T) / mean(x, na.rm=T))))
     mcp7d.95<-as.numeric(with(x, tapply(x$area+0.001,id_ym, quantile,.95, na.rm=T)))
     mcp7d.05<-as.numeric(with(x, tapply(x$area+0.001,id_ym, quantile,.05, na.rm=T)))
+    
+    year  <- as.numeric(sub(".*\\.(\\d{4})-\\d{2}$", "\\1", unique(id_ym)))
+    month <- as.numeric(sub(".*\\.\\d{4}-(\\d{2})$", "\\1", unique(id_ym)))
     
     # build dataframe
     dats<-data.frame(individual_id,year,month,n.mcp7d.weeks,

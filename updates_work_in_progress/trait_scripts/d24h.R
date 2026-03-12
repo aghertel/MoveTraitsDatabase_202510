@@ -99,6 +99,9 @@ f_sum.monthly.ind.d24h<-function(x)
     d24h.95 <- as.numeric(with(x, tapply(x$d24h+0.001,id_ym, quantile,.95, na.rm=T)))
     d24h.05 <- as.numeric(with(x, tapply(x$d24h+0.001,id_ym, quantile,.05, na.rm=T)))
     
+    year  <- as.numeric(sub(".*\\.(\\d{4})-\\d{2}$", "\\1", unique(id_ym)))
+    month <- as.numeric(sub(".*\\.\\d{4}-(\\d{2})$", "\\1", unique(id_ym)))
+    
     # build dataframe
     dats<-data.frame(individual_id,year,month,n24h.days,
                      d24h.mean,d24h.median,d24h.cv,d24h.95,d24h.05)
