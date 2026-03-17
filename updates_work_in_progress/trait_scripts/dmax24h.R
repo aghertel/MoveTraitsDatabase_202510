@@ -139,7 +139,7 @@ f_sum.monthly.ind.dmax24h<-function(x)
     month <- as.integer(ym_split[, 2])
     
     # build dataframe
-    dats<-data.frame(unlist(individual_id),month,
+    dats<-data.frame(individual_id,month,
                      year, n.dmax24h.days,
                      dmax24h.mean,dmax24h.median,dmax24h.cv,dmax24h.95,dmax24h.05)
     

@@ -114,7 +114,6 @@ f_sum.monthly.ind.dmax7d<-function(x)
     
     # derive month and year from t_
     y <- as.numeric(substr(x$year_week, 1, 4))  
-    
     string_iso <- paste(y, sprintf("W%02d", as.numeric(x$week)), 1, sep="-")
     date <- ISOweek2date(string_iso)
     m <- format(date, "%m")
@@ -136,9 +135,13 @@ f_sum.monthly.ind.dmax7d<-function(x)
     dmax7d.95<-as.numeric(with(x, tapply(x$dmax7d+0.001,id_ym, quantile,.95, na.rm=T)))
     dmax7d.05<-as.numeric(with(x, tapply(x$dmax7d+0.001,id_ym, quantile,.05, na.rm=T)))
     
+    year  <- as.numeric(sub(".*\\.(\\d{4})-\\d{2}$", "\\1", unique(id_ym)))
+    month <- as.numeric(sub(".*\\.\\d{4}-(\\d{2})$", "\\1", unique(id_ym)))
+    
     # build dataframe
     dats<-data.frame(individual_id,year,month,n.dmax7d.weeks,dmax7d.mean,dmax7d.median,dmax7d.cv,dmax7d.95,dmax7d.05)
     
     return(dats)
   }
+  rm(year);rm(month);rm(string_iso);rm(date);rm(m);rm(ym);rm(y);rm(ym_grp);rm(dats);rm(individual_id)
 }

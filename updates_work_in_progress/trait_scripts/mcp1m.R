@@ -60,8 +60,6 @@ return(mcp.monthly);rm(centers_10);rm(centers_1)
 
 
 
-
-
 ## ----function to summarize 1m MCP--------------------
 f_sum.ind.mcp1m<-function(x)
 {

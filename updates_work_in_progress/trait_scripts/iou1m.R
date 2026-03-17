@@ -25,7 +25,8 @@ iou1m <-
       left_join(tmp.mcp1m[,c("id_month","area")],by = "id_month")  |>  
       mutate(iou1m = cumsum.d24h/sqrt(area))  |>  
       filter(!is.na(iou1m)) |> ungroup() |> 
-      dplyr::select(individual_id,month,year,year_month,iou1m,mean.x,mean.y)  
+      dplyr::select(individual_id,month,year,year_month,iou1m,mean.x,mean.y) |> 
+      mutate(individual_id = as.character(individual_id))
   }
 
 if(is.null(iou1m)) NULL else {

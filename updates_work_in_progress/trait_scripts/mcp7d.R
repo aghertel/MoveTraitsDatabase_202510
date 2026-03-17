@@ -104,7 +104,7 @@ f_sum.monthly.ind.mcp7d<-function(x)
     # derive month and year from t_
     year <- as.numeric(substr(x$year_week, 1, 4))  
     
-    string_iso <- paste(y, sprintf("W%02d", as.numeric(x$week)), 1, sep="-")
+    string_iso <- paste(year, sprintf("W%02d", as.numeric(x$week)), 1, sep="-")
     date <- ISOweek2date(string_iso)
     month <- format(date, "%m")
     ym <- paste(year,month,sep="-")
