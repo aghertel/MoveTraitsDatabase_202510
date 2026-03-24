@@ -43,11 +43,11 @@ if(is.null(iou12m)) NULL else {
   centers_1 <- dgSEQNUM_to_GEO(dggs.1, iou12m$grid.id.1km)
   iou12m$lon.1km <- centers_1$lon_deg
   iou12m$lat.1km <- centers_1$lat_deg
-
+  
+  rm(cell_info_1);rm(centers_1)  
+  rm(cell_info_10);rm(centers_10)
+  
 }
-rm(cell_info_1);rm(centers_1)  
-rm(cell_info_10);rm(centers_10)
-
 return(iou12m)
 }
 ## ----function to summarize IoU12m--------------------
