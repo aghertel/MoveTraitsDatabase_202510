@@ -58,15 +58,16 @@ referenceTableStudiesUsed <- referenceTableStudies[referenceTableStudies$exclude
 
 flsMV <- flsMV[flsMV %in% referenceTableStudiesUsed$fileName]
 
-# load data of one individual and apply all trait extraction functions its tracking data 
-#lapply(flsMV, function(indPth)
-#  {
-
+# flsMV <- c("10596067_10666985.rds","3809257699_3809647332.rds")
 # example ciconia ciconia - 10596067_10666985.rds
 # example anas platyrhynchos - #446579_7945602.rds
 # example panthera leo - 3809257699_3809647332.rds
 
-  animlocs.1hourly <- readRDS(paste0(pthamt1h,"3809257699_3809647332.rds")) 
+# load data of one individual and apply all trait extraction functions its tracking data 
+lapply(flsMV, function(indPth)
+  {
+  #indPth <- flsMV[[1]]
+  animlocs.1hourly <- readRDS(paste0(pthamt1h,indPth)) 
   
 ## ----Resample data-------------------------------------------------------------
 #Resample data to 24h, 7 week time scales using amt
@@ -191,7 +192,7 @@ MoveTrait.ind.sum <-
     droplevels() }
 
 #Save database with summaries
-saveRDS(MoveTrait.ind.sum, file=paste0(pthtraitsum,"3809257699_3809647332.rds"))
+saveRDS(MoveTrait.ind.sum, file=paste0(pthtraitsum,indPth))
 
 ## ----Individual monthly summary database--------------------
 
@@ -249,7 +250,7 @@ MoveTrait.monthly.ind.sum <-
       droplevels()  }
 
 #Save database with individual monthly summaries
-saveRDS(MoveTrait.monthly.ind.sum, file=paste0(pthtraitsummonthly,"3809257699_3809647332.rds"))
+saveRDS(MoveTrait.monthly.ind.sum, file=paste0(pthtraitsummonthly,indPth))
 
 ## ----Build full database including raw metrics data--------------------
 
@@ -259,7 +260,7 @@ MoveTrait.repeats <-
   dplyr::select(individual_id,study_id) |> 
   tidyr::nest(data = -individual_id) %>% 
   dplyr::select(-data) %>% # just a quick trick to keep things flowing.
-  left_join(., MoveTrait.ind.sum[!duplicated(MoveTrait.ind.sum$individual_id)], 
+  left_join(., MoveTrait.ind.sum[!duplicated(MoveTrait.ind.sum$individual_id),1:2], 
             by = c("individual_id" = "individual_id")) %>% 
   
   # 1 hourly
@@ -346,12 +347,12 @@ MoveTrait.repeats <-
 
     
 ## ----Save full database including raw metrics data--------------------
-saveRDS(MoveTrait.repeats, file=paste0(pthtrait,"3809257699_3809647332.rds"))
+saveRDS(MoveTrait.repeats, file=paste0(pthtrait,indPth))
 
 
-rm(animlocs.1hourly_sl);rm(animlocs.daily_sl);rm(dmax7d);rm(dmax12m);rm(mcp.daily);
-rm(mcp.weekly);rm(mcp.monthly);rm(mcp.annual);rm(df.IoU24h);rm(df.IoU1m);
-rm(df.IoU12m);rm(DI)
+rm(d1h);rm(d24h);rm(dmax7d);rm(dmax12m);rm(mcp24h);
+rm(mcp7d);rm(mcp1m);rm(mcp12m);rm(iou24h);rm(iou1m);
+rm(iou12m);rm(di)
 
-#})
+})
 
