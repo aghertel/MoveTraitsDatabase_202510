@@ -140,8 +140,6 @@ f_sum.monthly.ind.dmax7d<-function(x)
     
     # build dataframe
     dats<-data.frame(individual_id,year,month,n.dmax7d.weeks,dmax7d.mean,dmax7d.median,dmax7d.cv,dmax7d.95,dmax7d.05)
-    
     return(dats)
   }
-  rm(year);rm(month);rm(string_iso);rm(date);rm(m);rm(ym);rm(y);rm(ym_grp);rm(dats);rm(individual_id)
 }
