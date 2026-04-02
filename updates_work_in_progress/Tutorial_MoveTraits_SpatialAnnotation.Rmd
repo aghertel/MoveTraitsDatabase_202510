@@ -18,7 +18,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r packages, warning=FALSE,message=FALSE}
-library(tidyverse);library(bit64); library(geodata);library(dggridR);library(terra); library(sf);library(terra); library(mapview)
+library(tidyverse);library(bit64); library(geodata);library(dggridR);library(terra); library(sf);library(terra); library(mapview);library(RColorBrewer)
 ```
 
 # Download the database
@@ -69,15 +69,14 @@ ggplot() +
 ```{r}
 #MoveTrait.v0.1.sp <- readRDS("MoveTrait.v0.1_species.sum_20251011.rds")
 
-dim(MoveTrait.v0.1.sp)
+#dim(MoveTrait.v0.1.sp)
 ```
 
 
 ## Individual level
 
 ```{r}
-MoveTrait.v0.1.ind <- readRDS("StandardGrid/DATA/5.MB_indv_traitsum/10596067_10666985.rds")
-#MoveTrait.v0.1.ind$study_id <- as.integer64(MoveTrait.v0.1.ind$study_id)
+MoveTrait.v0.1.ind <- readRDS("updates_work_in_progress/DATA/5.MB_indv_traitsum/10596067_10666985.rds")
 ```
 
 The individual level database follows the same structure as the species level database. But contains more individual level information:
@@ -102,7 +101,7 @@ knitr::kable(column_info, caption = "Column descriptions")
 
 From cell identity to spatial annotation
 ```{r,echo=F}
-grid.id.100km <- as.numeric(unlist(strsplit(MoveTrait.v0.1.ind$grid.id.100km, ";")))
+grid.id.100km <- as.numeric(unlist(strsplit(MoveTrait.v0.1.ind$id.100km, ";")))
 print(grid.id.100km)
 length(grid.id.100km)
 ```
@@ -120,22 +119,35 @@ Get the centroid coordinates of these cells to intersect with environmental laye
 lon <- dgSEQNUM_to_GEO(dggs.100, grid.id.100km)$lon_deg
 lat <- dgSEQNUM_to_GEO(dggs.100, grid.id.100km)$lat_deg
 centroids <- data.frame(grid.id.100km,lon,lat)
+head(centroids)
 ```
 
 Example - load and extract HFI values associated with the animals occurrence
 ```{r}
 hfi <- geodata::footprint(year = 2009, path = ".")
+plot(hfi)
+```
+
+```{r}
 pts <- vect(centroids, crs = "EPSG:4326")
 values <- terra::extract(hfi, pts, ID = FALSE, bind = TRUE)
 head(values)
 ```
 
 ```{r}
-plot(hfi)
-plot(pts, add = TRUE, col = "red", pch = 16)
+values_sf <- sf::st_as_sf(values)
+intersect_cells_100 <- intersect_cells_100 |> 
+  left_join(st_drop_geometry(values_sf), by = c("seqnum" = "grid.id.100km")) 
+
+mapview(intersect_cells_100, map.types = c("OpenStreetMap.DE"), 
+        zcol = "wildareas.v3.2009.human.footprint",
+        col.regions = colorRampPalette(rev(brewer.pal(11, "RdYlBu"))))
 ```
 
 ## Monthly summary
+```{r}
+MoveTrait.v0.1.month <- readRDS("updates_work_in_progress/DATA/6.MB_indv_monthly_traitsum/10596067_10666985.rds")
+```
 
 
 

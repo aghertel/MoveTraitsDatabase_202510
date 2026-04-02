@@ -18,8 +18,8 @@ iou1m <-
       mutate(year_month = paste(year,month,sep="_"),
              id_month = paste(individual_id,year_month,sep="."))  |>  group_by(id_month)  |>  
       mutate(cumsum.d24h = sum(d24h,na.rm=T),
-             mean.x = mean(x_),
-             mean.y = mean(y_))  |>  
+             mean.x = mean(lon),
+             mean.y = mean(lat))  |>  
       dplyr::select(individual_id,id_month,month,year,year_month,cumsum.d24h,mean.x,mean.y)  |>
       distinct() |> 
       left_join(tmp.mcp1m[,c("id_month","area")],by = "id_month")  |>  
@@ -78,4 +78,24 @@ f_sum.ind.iou1m<-function(x)
     
     return(dats)
   }}
+
+
+## ----summarize iou1m at monthly individual level---------
+f_sum.monthly.ind.iou1m<-function(x)
+{
+  # Check if the input is NULL
+  if (is.null(x)) {
+    return(data.frame(individual_id = NA,month= NA,
+                      year= NA, iou1m = NA ))
+  } 
+  
+  individual_id <- x$individual_id
+  year <- x$year
+  month <- x$month
+  iou1m <- x$iou1m
+  
+  # build dataframe
+  dats<-data.frame(individual_id,year,month,iou1m)
+  
+}
 
