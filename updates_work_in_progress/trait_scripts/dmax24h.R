@@ -81,7 +81,6 @@ f_sum.ind.dmax24h<-function(x)
     dats <- data.frame(individual_id = NA,n.dmax24h.days = NA,
                        dmax24h.mean = NA,dmax24h.median = NA,dmax24h.cv = NA,dmax24h.95 = NA,dmax24h.05 = NA)
   } else {
-
     individual_id <- with(x, tapply(as.character(x$individual_id),individual_id, unique))
     
     # Get sample size per indivindividual_idual
