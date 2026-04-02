@@ -20,8 +20,8 @@ iou12m <-
     trk  |>   
       mutate(id_year = paste(individual_id,year,sep="."))  |>  group_by(id_year) |>  
       mutate(cumsum.d24h = sum(d24h,na.rm=T),
-             mean.x = mean(x_),
-             mean.y = mean(y_)) |>  
+             mean.x = mean(lon),
+             mean.y = mean(lat)) |>  
       dplyr::select(id_year,year,individual_id,cumsum.d24h,mean.x,mean.y) |>  distinct() |> 
       left_join(tmp.mcp12m[,c("id.year","area")],by = c("id_year"="id.year")) |>  
       mutate(iou12m = cumsum.d24h/sqrt(area)) |> 
