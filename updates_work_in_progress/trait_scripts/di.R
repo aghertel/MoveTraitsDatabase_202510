@@ -26,8 +26,8 @@ di <-
   if(is.null(trk) ) NULL else {
     
     diurn.ind <- trk |> 
-      mutate(lat=y_,lon=x_,date=as.Date(t_)) |> 
-      dplyr::select(lat,lon,date,individual_id,t_,ymd,d1h) 
+      mutate(date=as.Date(timestamp)) |> 
+      dplyr::select(lon,lat,date,individual_id,timestamp,ymd,d1h) 
     
     sun_all <- getSunlightTimes(data = diurn.ind, 
                                 tz = "UTC",
@@ -37,8 +37,8 @@ di <-
     diurn.ind$sunset<- sun_all$sunset
     
     diurn.ind$daytime <- 
-      ifelse(diurn.ind$t_ < diurn.ind$sunrise |
-               diurn.ind$t_ > diurn.ind$sunset, "night","day")
+      ifelse(diurn.ind$timestamp < diurn.ind$sunrise |
+               diurn.ind$timestamp > diurn.ind$sunset, "night","day")
     
     mean.coord <- diurn.ind |> 
       mutate(id.day = paste(individual_id,ymd,sep=".")) |> group_by(id.day) |> 

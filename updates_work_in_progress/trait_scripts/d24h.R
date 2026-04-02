@@ -14,24 +14,30 @@ calc_d24h <- function(trk,
   mutate(time_diff = as.numeric(difftime(lead(t_),t_, units = "hours"))) |> 
   filter(time_diff >= mindt & time_diff <= maxdt) |> 
   dplyr::select(individual_id, t_, d24h, x_, y_) |> 
-  mutate(ymd = as.character(format(as.Date(t_), "%Y-%m-%d")),
+  mutate(t_ = floor_date(t_, "hour"),
+         ymd = as.character(format(as.Date(t_), "%Y-%m-%d")),
          month = lubridate::month(t_),
-         year = lubridate::year(t_))|> 
-  filter(!is.na(d24h))
-
+         year = lubridate::year(t_),
+         individual_id = as.character(individual_id))|> 
+  filter(!is.na(d24h)) |>  
+    rename("timestamp" = "t_",
+           "lon" = "x_",
+           "lat" = "y_") |>
+    dplyr::select(individual_id, timestamp, month,year, d24h, lon, lat) 
+  
   # drop if too short
   if (nrow(out) < min_n) return(NULL)
   
 #if(is.null(out)) NULL else {
   # Spatial annotation 10km
-  cell_info <- dgGEO_to_SEQNUM(dggs.10, out$x_, out$y_)
+  cell_info <- dgGEO_to_SEQNUM(dggs.10, out$lon, out$lat)
   out$grid.id.10km <- cell_info$seqnum
   centers <- dgSEQNUM_to_GEO(dggs.10, out$grid.id.10km)
   out$lon.10km <- centers$lon_deg
   out$lat.10km <- centers$lat_deg
   
   # Spatial annotation 1km
-  cell_info <- dgGEO_to_SEQNUM(dggs.1, out$x_, out$y_)
+  cell_info <- dgGEO_to_SEQNUM(dggs.1, out$lon, out$lat)
   out$grid.id.1km <- cell_info$seqnum
   centers <- dgSEQNUM_to_GEO(dggs.1, out$grid.id.1km)
   out$lon.1km <- centers$lon_deg
@@ -53,7 +59,7 @@ f_sum.ind.d24h<-function(x)
     individual_id<-with(x, tapply(as.character(x$individual_id),individual_id, unique))
     
     # Get sample size per indivindividual_idual
-    n24h.days<-as.numeric(with(x, tapply(as.character(x$t_),individual_id, length)))
+    n24h.days<-as.numeric(with(x, tapply(as.character(x$timestamp),individual_id, length)))
     
     # 24hr Displacement
     d24h.mean <- as.numeric(with(x, tapply(x$d24h+0.001,individual_id, mean, na.rm=T)))
@@ -81,7 +87,7 @@ f_sum.monthly.ind.d24h<-function(x)
   } 
   
   # derive month and year from t_
-  ym <- format(x$t_, "%Y-%m")  
+  ym <- format(x$timestamp, "%Y-%m")  
   
   # group index: individual x month
   id_ym <- interaction(x$individual_id, ym, drop = TRUE)
@@ -90,7 +96,7 @@ f_sum.monthly.ind.d24h<-function(x)
   ym_grp        <- tapply(ym, id_ym, unique)
   
   # sample size per individual-month
-  n24h.days<-as.numeric(tapply(x$t_, id_ym, length))
+  n24h.days<-as.numeric(tapply(x$timestamp, id_ym, length))
     
     # 24hr Displacement
     d24h.mean <- as.numeric(with(x, tapply(x$d24h+0.001,id_ym, mean, na.rm=T)))

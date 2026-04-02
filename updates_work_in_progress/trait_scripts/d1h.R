@@ -7,27 +7,33 @@ calc_d1h <- function(trk,
                      dist_factor = 100000,
                      mindt = 45,
                      maxdt = 75) {
-  
   out <- trk %>% 
-    mutate(d1h = step_lengths(.) * dist_factor) %>% 
-    mutate(time_diff = as.numeric(difftime(lead(t_), t_, units = "mins"))) %>% 
-    filter(time_diff >= mindt & time_diff <= maxdt) %>% 
-    dplyr::select(individual_id, t_, d1h, x_, y_) %>% 
-    mutate(ymd = as.character(format(as.Date(t_), "%Y-%m-%d"))) %>% 
-    filter(!is.na(d1h))
+    mutate(d1h = step_lengths(.) * dist_factor)  |>  
+    mutate(time_diff = as.numeric(difftime(lead(t_), t_, units = "mins")))  |>  
+    filter(time_diff >= mindt & time_diff <= maxdt) |>  
+    filter(!is.na(d1h)) |>     
+    mutate(t_ = floor_date(t_, "hour"),
+           ymd = as.character(format(as.Date(t_), "%Y-%m-%d")),
+           individual_id = as.character(individual_id)) |>
+    dplyr::select(individual_id, t_, ymd, d1h, x_, y_) |>  
+    rename("timestamp" = "t_",
+           "lon" = "x_",
+           "lat" = "y_") 
+    
+    
   
   # drop if too short
   if (nrow(out) < min_n) return(NULL)
   
   # spatial annotation 10 km
-  cell_info_10 <- dgGEO_to_SEQNUM(dggs_10, out$x_, out$y_)
+  cell_info_10 <- dgGEO_to_SEQNUM(dggs_10, out$lon, out$lat)
   out$grid.id.10km <- cell_info_10$seqnum
   centers_10 <- dgSEQNUM_to_GEO(dggs_10, out$grid.id.10km)
   out$lon.10km <- centers_10$lon_deg
   out$lat.10km <- centers_10$lat_deg
   
   # spatial annotation 1 km
-  cell_info_1 <- dgGEO_to_SEQNUM(dggs_1, out$x_, out$y_)
+  cell_info_1 <- dgGEO_to_SEQNUM(dggs_1, out$lon, out$lat)
   out$grid.id.1km <- cell_info_1$seqnum
   centers_1 <- dgSEQNUM_to_GEO(dggs_1, out$grid.id.1km)
   out$lon.1km <- centers_1$lon_deg
@@ -46,11 +52,10 @@ f_sum.ind.d1h <- function(x)
     dats <- data.frame(individual_id = NA,n1h = NA,
                        d1h.mean = NA,d1h.median = NA,d1h.cv = NA,d1h.95 = NA,d1h.05 = NA)
   } else {
-    
     individual_id <- with(x, tapply(as.character(x$individual_id),individual_id, unique))
     
     # Get sample size per individual
-    n1h<-as.numeric(with(x, tapply(as.character(x$t_),individual_id, length)))
+    n1h<-as.numeric(with(x, tapply(as.character(x$timestamp),individual_id, length)))
     
     # 1hr Displacement
     d1h.mean <- as.numeric(with(x, tapply(x$d1h+0.001,individual_id, mean, na.rm=T)))
@@ -86,7 +91,7 @@ f_sum.monthly.ind.d1h <- function(x) {
   }
   
   # derive month and year from t_
-  ym <- format(x$t_, "%Y-%m")  
+  ym <- format(x$timestamp, "%Y-%m")  
   
   # group index: individual x month
   id_ym <- interaction(x$individual_id, ym, drop = TRUE)
@@ -95,7 +100,7 @@ f_sum.monthly.ind.d1h <- function(x) {
   ym_grp        <- tapply(ym, id_ym, unique)
   
   # sample size per individual-month
-  n1h <- as.numeric(tapply(x$t_, id_ym, length))
+  n1h <- as.numeric(tapply(x$timestamp, id_ym, length))
   
   # 1h displacement summaries per individual-month
   d1h.mean   <- as.numeric(tapply(x$d1h + 0.001, id_ym, mean,    na.rm = TRUE))
