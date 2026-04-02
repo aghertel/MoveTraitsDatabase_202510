@@ -5,7 +5,7 @@ calc_iou24h <- function(area,
                         dggs_1, 
                         min_weeks_n = 36) 
 {
-
+  
 tmp.mcp24h <- 
   if(is.null(area)) NULL else {
     area|>
@@ -17,8 +17,8 @@ iou24h <-
     trk |>  
       group_by(ymd) %>% 
       mutate(cumsumD1h = sum(d1h,na.rm=T),
-             mean.x = mean(x_),
-             mean.y = mean(y_)) %>% 
+             mean.x = mean(lon),
+             mean.y = mean(lat)) %>% 
       dplyr::select(individual_id,ymd,cumsumD1h,mean.x,mean.y) %>% distinct() %>%
       left_join(tmp.mcp24h[,c("ymd","area")],by = "ymd") %>% 
       mutate(iou24h = cumsumD1h/sqrt(area)) %>% 
