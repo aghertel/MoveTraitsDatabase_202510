@@ -58,19 +58,9 @@ referenceTableStudiesUsed <- referenceTableStudies[referenceTableStudies$exclude
 
 flsMV <- flsMV[flsMV %in% referenceTableStudiesUsed$fileName]
 
-# Kevin files
-lookup <- c("82684","446579","481458","1764627","2919708","2927282","2943485","2988309","3109235","3780829")
-prefix <- sub("_.*", "", flsMV)
-keep <- flsMV[prefix %in% lookup]
-
-#flsMV <- c("10596067_10666985.rds","3809257699_3809647332.rds")
-# example ciconia ciconia - 10596067_10666985.rds
-# example anas platyrhynchos - #446579_7945602.rds
-# example panthera leo - 3809257699_3809647332.rds
-
 # load data of one individual and apply all trait extraction functions its tracking data 
-kp <- keep[1]
-lapply(keep, function(indPth)
+flsMV
+lapply(flsMV, function(indPth)
   {
   #indPth<-keep[1]
   animlocs.1hourly <- readRDS(file.path(pthamt1h, kp))
