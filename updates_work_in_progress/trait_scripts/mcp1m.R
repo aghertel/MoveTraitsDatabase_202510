@@ -86,3 +86,27 @@ f_sum.ind.mcp1m<-function(x)
     return(dats)
   }
 }
+
+
+## ----summarize mcp1m at monthly individual level---------
+f_sum.monthly.ind.mcp1m<-function(x)
+{
+  # Check if the input is NULL
+  if (is.null(x)) {
+    return(data.frame(individual_id = NA,month= NA,
+                      year= NA, mcp1m = NA ))
+  } 
+  
+  individual_id <- x$individual_id
+  year <- as.numeric(substr(x$year_month, 1, 4))
+  month <- x$month
+  mcp1m <- x$area
+  
+  # build dataframe
+  dats<-data.frame(individual_id,year,month,mcp1m)
+  
+}
+
+
+
+
