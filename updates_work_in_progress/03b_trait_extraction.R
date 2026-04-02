@@ -58,16 +58,22 @@ referenceTableStudiesUsed <- referenceTableStudies[referenceTableStudies$exclude
 
 flsMV <- flsMV[flsMV %in% referenceTableStudiesUsed$fileName]
 
-# flsMV <- c("10596067_10666985.rds","3809257699_3809647332.rds")
+# Kevin files
+lookup <- c("82684","446579","481458","1764627","2919708","2927282","2943485","2988309","3109235","3780829")
+prefix <- sub("_.*", "", flsMV)
+keep <- flsMV[prefix %in% lookup]
+
+#flsMV <- c("10596067_10666985.rds","3809257699_3809647332.rds")
 # example ciconia ciconia - 10596067_10666985.rds
 # example anas platyrhynchos - #446579_7945602.rds
 # example panthera leo - 3809257699_3809647332.rds
 
 # load data of one individual and apply all trait extraction functions its tracking data 
-lapply(flsMV, function(indPth)
+kp <- keep[1]
+lapply(keep, function(indPth)
   {
-  #indPth <- flsMV[[1]]
-  animlocs.1hourly <- readRDS(paste0(pthamt1h,indPth)) 
+  #indPth<-keep[1]
+  animlocs.1hourly <- readRDS(file.path(pthamt1h, kp))
   
 ## ----Resample data-------------------------------------------------------------
 #Resample data to 24h, 7 week time scales using amt
@@ -84,7 +90,7 @@ animlocs.weekly <- animlocs.1hourly |>
 
 #1h displacement----
 d1h <- calc_d1h(animlocs.1hourly, dggs.10, dggs.1)
-sum.ind.d1h <- f_sum.ind.d1h(d1h)
+sum.ind.d1h <- f_sum.ind.d1h(d1h) 
 sum.monthly.ind.d1h <- f_sum.monthly.ind.d1h(d1h)
 
 #24hr displacement distance----
@@ -119,10 +125,7 @@ sum.monthly.ind.mcp7d <- f_sum.monthly.ind.mcp7d(mcp7d)
 #Monthly MCP----
 mcp1m <- calc_mcp1m(animlocs.daily, dggs.10, dggs.1)
 sum.ind.mcp1m <- f_sum.ind.mcp1m(mcp1m)
-sum.monthly.ind.mcp1m <- mcp1m[,1:4] |> 
-  rename(mcp1m = area) |> 
-  mutate(year = as.numeric(substr(year_month, 1, 4))) |> 
-  dplyr::select(individual_id,month,year,mcp1m)
+sum.monthly.ind.mcp1m <- f_sum.monthly.ind.mcp1m(mcp1m)
 
 #Annual MCP----
 mcp12m <- calc_mcp12m(animlocs.weekly, dggs.10, dggs.1)
@@ -136,7 +139,7 @@ sum.monthly.ind.iou24h <- f_sum.monthly.ind.iou24h(iou24h)
 #Monthly IOU----
 iou1m <- calc_iou1m(mcp1m,d24h, dggs.10, dggs.1)
 sum.ind.iou1m <- f_sum.ind.iou1m(iou1m)
-sum.monthly.ind.iou1m <- iou1m[,c(1,2,3,5)] 
+sum.monthly.ind.iou1m <- f_sum.monthly.ind.iou1m(iou1m) 
 
 #Annual IOU----
 iou12m <- calc_iou12m(mcp12m,d24h, dggs.10, dggs.1)
@@ -349,10 +352,9 @@ MoveTrait.repeats <-
 ## ----Save full database including raw metrics data--------------------
 saveRDS(MoveTrait.repeats, file=paste0(pthtrait,indPth))
 
-
-rm(d1h);rm(d24h);rm(dmax7d);rm(dmax12m);rm(mcp24h);
-rm(mcp7d);rm(mcp1m);rm(mcp12m);rm(iou24h);rm(iou1m);
-rm(iou12m);rm(di)
+# rm(d1h);rm(d24h);rm(dmax7d);rm(dmax12m);rm(mcp24h);
+# rm(mcp7d);rm(mcp1m);rm(mcp12m);rm(iou24h);rm(iou1m);
+# rm(iou12m);rm(di);rm(animlocs.1hourly);rm(animlocs.daily);rm(animlocs.weekly)
 
 })
 
