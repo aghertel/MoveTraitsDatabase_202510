@@ -76,7 +76,7 @@ ggplot() +
 ## Individual level
 
 ```{r}
-MoveTrait.v0.1.ind <- readRDS("updates_work_in_progress/DATA/5.MB_indv_traitsum/10596067_10666985.rds")
+MoveTrait.v0.1.ind <- readRDS("DATA/5.MB_indv_traitsum/10596067_10666985.rds")
 ```
 
 The individual level database follows the same structure as the species level database. But contains more individual level information:
@@ -101,7 +101,7 @@ knitr::kable(column_info, caption = "Column descriptions")
 
 From cell identity to spatial annotation
 ```{r,echo=F}
-grid.id.100km <- as.numeric(unlist(strsplit(MoveTrait.v0.1.ind$id.100km, ";")))
+grid.id.100km <- as.numeric(unlist(strsplit(MoveTrait.v0.1.ind$grid.id.100km, ";")))
 print(grid.id.100km)
 length(grid.id.100km)
 ```
@@ -145,42 +145,118 @@ mapview(intersect_cells_100, map.types = c("OpenStreetMap.DE"),
 ```
 
 ## Monthly summary
+
 ```{r}
-MoveTrait.v0.1.month <- readRDS("updates_work_in_progress/DATA/6.MB_indv_monthly_traitsum/10596067_10666985.rds")
+MoveTrait.v0.1.month <- readRDS("DATA/6.MB_indv_monthly_traitsum/10596067_10666985.rds")
 ```
 
+In the monthly summary we have summarized traits for each tracking month. These summaries can be spatially referenced using the grid.id.100km and grid.id.10km columns.
 
+```{r, echo = F}
+column_info <- data.frame(
+  ColumnName = 
+    c(names(MoveTrait.v0.1.month)[1:6]
+      ),
+  Explanation = c(
+    "Movebank study identifier",
+    "Movebank individual identifier",
+    "Monitoring month",
+    "Monitoring year",
+    "Intersecting 100km grid cell identities",
+    "Intersecting 10km grid cell identities"
+  )
+)
+
+knitr::kable(column_info, caption = "Column descriptions")
+```
+
+The information, which cells were occupied in which months need to be unpacked from wide to long format, here exemplary done for grid.id.100km. The same procedure applies to the 10km grid.
+
+```{r}
+monthly_cells_100 <-
+  MoveTrait.v0.1.month %>%
+  separate_rows(grid.id.100km, sep = ";") %>%   
+  mutate(grid.id.100km = as.numeric(grid.id.100km),
+         month = str_pad(month, width = 2, pad = "0"),
+         month_year = as.factor(paste(month,year,sep="_")))
+```
+
+The long format data column can then be used to identify which cells were occupied. 
+```{r}
+intersect_cells_100 <- dgcellstogrid(dggs.100, monthly_cells_100$grid.id.100km)
+intersect_cells_100 <- 
+  merge(intersect_cells_100,
+        monthly_cells_100[,c("grid.id.100km","month_year")],
+        by.x="seqnum",by.y="grid.id.100km")
+```
+
+We can now visualize where the individual had been in specific months.
+```{r}
+mapview(intersect_cells_100, map.types = c("OpenStreetMap.DE"), zcol = "month_year")
+```
+
+For range resident species, a gridded representation may be more useful.
+```{r}
+ggplot() +
+    geom_sf(data = intersect_cells_100, fill = NA, colour = "black") +
+    theme_classic() +
+    facet_wrap(~month_year) +
+    theme(axis.text = element_blank())
+```
+
+Trait summaries can be annotated with environmental conditions using time information (i.e. month and year) and monthly specific cell centroids. 
+
+```{r}
+lon_100km <- dgSEQNUM_to_GEO(dggs.100, monthly_cells_100$grid.id.100km)$lon_deg
+lat_100km <- dgSEQNUM_to_GEO(dggs.100, monthly_cells_100$grid.id.100km)$lat_deg
+centroids <- data.frame(monthly_cells_100,lon_100km,lat_100km)
+head(centroids)
+```
 
 ## Within Individual level
 
-```{r}
-MoveTrait.v0.1_rep.ind <- readRDS("StandardGrid/DATA/6.MB_indv_trait/10596067_10666985.rds")
-```
-
-The third level of the database provides repeated individual trait measures. It is structured in the following way - first we provide the individual level summaries, simialr to "MoveTrait.v0.1.ind", for each individual and every trait we provide the underlying repeated trait measures as a list of nested dataframes in columns 91 - 103
+### How individual repeated trait measures will be annotated is still up for discussion!!
 
 ```{r}
-names(MoveTrait.v0.1_rep.ind[,85:94])
-class(MoveTrait.v0.1_rep.ind[,86])
+MoveTrait.v0.1_rep.ind <- readRDS("DATA/7.MB_indv_trait/10596067_10666985.rds")
 ```
 
-For example for column 85 - "MaxDispl.24h" (24hr displacement), the underlying distribution for the first individual in the dataframe can be accessed in the following way. 
-It contains the mean latitude and longitude of that day for open access data. For closed access data it contains the identity of the grid cell that contains the mean coordinate, at either 10km, or 10 and 1km resolution, depending on the data owner's sharing selection. Because only one coordinate is associated with every repeated trait measure, we here already provide the grid cell centroids in the database (????).
+The third level of the database provides repeated individual trait measures. For each individual and every trait we provide the underlying repeated trait measures as a list of nested dataframes in columns 3 - 12
 
 ```{r}
-MoveTrait.v0.1_rep.ind[,86][[1]]
-displ24h <-data.frame(MoveTrait.v0.1_rep.ind[,86][[1]])
+names(MoveTrait.v0.1_rep.ind)
+class(MoveTrait.v0.1_rep.ind[,5])
 ```
 
-These centroids can be directly used to associate environmental layers.
+The underlying distribution for the trait "dmax24h" (maximum 24hr displacement) in column five, for the first individual in the database can be accessed in the following way. 
+
+```{r}
+MoveTrait.v0.1_rep.ind[,12][[1]]
+```
+
+For open access data, it contains the mean latitude and longitude of the particular day when the trait was measured. For closed access data it contains the identity of the grid cell that contains the mean coordinate, at either 10km, or 10 and 1km resolution, depending on the data owner's sharing selection. Only one coordinate is associated with every repeated trait measure and it is easy to link these back to the grid cell centroids.
+
+```{r}
+example.displ24h <-data.frame(MoveTrait.v0.1_rep.ind[,][[1]])
+```
+
+These centroids can be directly used to extract information from environmental layers.
 ```{r, echo = F}
-pts <- terra::vect(displ24h, geom=c("lon.10km", "lat.10km"), crs = "EPSG:4326")
+pts <- terra::vect(example.displ24h, geom=c("lon.10km", "lat.10km"), crs = "EPSG:4326")
 values <- terra::extract(hfi, pts, ID = FALSE, bind = TRUE)
 ```
 
+
 ```{r}
-intersect_cells_10 <- dgcellstogrid(dggs.10, displ24h$grid.id.10km)
-mapview(intersect_cells_10, col.regions = "red", legend = FALSE)
+intersect_cells_10 <- dgcellstogrid(dggs.10, example.displ24h$grid.id.10km)
+values_sf <- sf::st_as_sf(values)
+intersect_cells_10 <- intersect_cells_10 |> 
+  left_join(st_drop_geometry(values_sf), by = c("seqnum" = "grid.id.10km")) 
+
+mapview(intersect_cells_10,
+        zcol = "wildareas.v3.2009.human.footprint",
+        col.regions = colorRampPalette(rev(brewer.pal(11, "RdYlBu"))))
 
 ```
+
 
