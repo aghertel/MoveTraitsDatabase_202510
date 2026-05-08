@@ -62,8 +62,8 @@ flsMV <- flsMV[flsMV %in% referenceTableStudiesUsed$fileName]
 flsMV
 lapply(flsMV, function(indPth)
   {
-  #indPth<-keep[1]
-  animlocs.1hourly <- readRDS(file.path(pthamt1h, kp))
+  #indPth<-flsMV[4500]
+  animlocs.1hourly <- readRDS(file.path(pthamt1h, indPth))
   
 ## ----Resample data-------------------------------------------------------------
 #Resample data to 24h, 7 week time scales using amt
