@@ -1,13 +1,35 @@
+crs_4326  <- sp::CRS("EPSG:4326")
+crs_moll <- sp::CRS("+proj=moll +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs +type=crs")
+
+## ----Function to get corner coordinates (vertices)-------------------------------------------------------------
+get_polygon_vertices <- function(mcp_spdf) {
+  out <- lapply(seq_along(mcp_spdf@polygons), function(i) {
+    coords <- mcp_spdf@polygons[[i]]@Polygons[[1]]@coords
+    if (all(coords[1, ] == coords[nrow(coords), ])) {
+      coords <- coords[-nrow(coords), , drop = FALSE]
+    }
+    
+    tmp <- SpatialPoints(coords, proj4string = crs_moll)
+    tmp_ll <- spTransform(tmp, crs_4326)
+    coords_ll <- coordinates(tmp_ll)
+    
+    data.frame(
+      id = mcp_spdf@data$id[i],
+      x_vertices = paste(coords_ll[, 1], collapse = ";"),
+      y_vertices = paste(coords_ll[, 2], collapse = ";"),
+      stringsAsFactors = FALSE
+    )
+  })
+  do.call(rbind, out)
+}
+
 ## ----Daily MCP-------------------------------------------------------------
-
-#' Daily range used based on hourly relocations including only individuals with at least 12 locations on a given day.
-
-
 calc_mcp24h <- function(trk, 
                          dggs_10, 
                          dggs_1, 
                          min_hours_n = 12) 
 {
+  #trk <- animlocs.1hourly
   dat.mcp.daily <- trk %>% 
   tibble() %>% mutate(ymd = as.character(format(as.Date(t_), "%Y-%m-%d")))  %>%
   filter(!is.na(x_)) %>% 
@@ -18,48 +40,63 @@ calc_mcp24h <- function(trk,
   ungroup() %>% 
   dplyr::select(x_,y_,id.day) 
 
-mean.coord <- dat.mcp.daily |> group_by(id.day) |> 
-  mutate(mean.x = mean(x_, na.rm=T),
-         mean.y = mean(y_, na.rm=T)) |> 
-  dplyr::select(id.day, mean.x, mean.y) |> distinct()
-
 tryCatch({
   coordinates(dat.mcp.daily) <- c("x_","y_")
-  proj4string(dat.mcp.daily) <- CRS("EPSG:4326")
-  dat.mcp.daily <- spTransform(dat.mcp.daily,sp::CRS("+proj=moll +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs +type=crs"))
+  proj4string(dat.mcp.daily) <- crs_4326
+  dat.mcp.daily <- spTransform(dat.mcp.daily,crs_moll)
 }, error = function(e) {NA})
 
-mcp.daily <- 
-  if(nrow(dat.mcp.daily)==0) NULL else {
-    mcp(dat.mcp.daily, percent = 95, unout = c( "m2")) %>% data.frame() %>% 
-      left_join(mean.coord, by = c("id" = "id.day")) |> 
-      mutate(ymd = str_split(id, '[.]', simplify = TRUE)[,2],
-             individual_id = str_split(id, '[.]', simplify = TRUE)[,1]) %>% 
-      filter(!is.na(area)) }
-
-if(is.null(mcp.daily)) NULL else {
-  # Spatial annotation 10km
-  mean.coord$grid.id.10km <- dgGEO_to_SEQNUM(dggs.10, mean.coord$mean.x, mean.coord$mean.y)$seqnum
-  mcp.daily <- mcp.daily |> left_join(mean.coord[,c("id.day","grid.id.10km")], by = c("id" = "id.day"))
-  centers_10 <- dgSEQNUM_to_GEO(dggs.10, mcp.daily$grid.id.10km)
-  mcp.daily$lon.10km <- centers_10$lon_deg
-  mcp.daily$lat.10km <- centers_10$lat_deg
+mcp.daily <- if (nrow(dat.mcp.daily) == 0) {
+  NULL
+} else {
+  mcp_spdf <- mcp(dat.mcp.daily, percent = 95, unout = c("m2"))
   
-  # Spatial annotation 1km
-  mean.coord$grid.id.1km <- dgGEO_to_SEQNUM(dggs.1, mean.coord$mean.x, mean.coord$mean.y)$seqnum
-  mcp.daily <- mcp.daily |> left_join(mean.coord[,c("id.day","grid.id.1km")], by = c("id" = "id.day"))
-  centers_1 <- dgSEQNUM_to_GEO(dggs.1, mcp.daily$grid.id.1km)
-  mcp.daily$lon.1km <- centers_1$lon_deg
-  mcp.daily$lat.1km <- centers_1$lat_deg
+  mcp_df <- data.frame(mcp_spdf) |>
+    mutate(
+      ymd = str_split(id, '[.]', simplify = TRUE)[,2],
+      individual_id = str_split(id, '[.]', simplify = TRUE)[,1]) |>
+    filter(!is.na(area))
   
-  mcp.daily <- mcp.daily |> 
-    dplyr::select(individual_id,ymd,area, mean.x, mean.y,
-                  grid.id.10km, lon.10km,  lat.10km, 
-                  grid.id.1km,  lon.1km,   lat.1km) 
+  verts_df <- get_polygon_vertices(mcp_spdf)
+  
+  mcp_df |>
+    left_join(verts_df, by = "id")
 }
 
+if (is.null(mcp.daily)) {
+  NULL
+} else {
+  vertices_long <- mcp.daily |>
+    dplyr::select(id, individual_id, ymd, area, x_vertices, y_vertices) |>
+    mutate(row_id = row_number()) |>
+    separate_rows(x_vertices, y_vertices, sep = ";") |>
+    mutate(
+      x_vertices = as.numeric(x_vertices),
+      y_vertices = as.numeric(y_vertices)
+    )
+  
+  grid_10 <- dgGEO_to_SEQNUM(dggs.10, vertices_long$x_vertices, vertices_long$y_vertices)$seqnum
+  grid_1  <- dgGEO_to_SEQNUM(dggs.1,  vertices_long$x_vertices, vertices_long$y_vertices)$seqnum
+  
+  vertices_long <- vertices_long |>
+    mutate(
+      grid.id.10km = grid_10,
+      grid.id.1km = grid_1
+    )
+  
+  grid_summary <- vertices_long |>
+    group_by(id, individual_id, ymd, area) |>
+    summarise(
+      x_vertices = paste(x_vertices, collapse = ";"),
+      y_vertices = paste(y_vertices, collapse = ";"),
+      grid.id.10km = paste(sort(unique(grid.id.10km)), collapse = ";"),
+      grid.id.1km = paste(sort(unique(grid.id.1km)), collapse = ";"),
+      .groups = "drop"
+    )
+  
+  mcp.daily <- grid_summary
+}
 return(mcp.daily)
-rm(mean.coord);rm(dat.mcp.daily);rm(centers_10);rm(centers_1)
 }
 
 ## ----function to summarize 1d MCP--------------------
