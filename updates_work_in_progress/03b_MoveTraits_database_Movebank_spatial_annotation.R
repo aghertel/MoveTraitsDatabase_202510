@@ -61,15 +61,15 @@ animlocs.1hourly <- readRDS(paste0(pthamt1h,"3809257699_3809647332.rds"))
 # intersect_cells_10 <- dgcellstogrid(dggs.10, grid.id.10km)
 # intersect_cells_100 <- dgcellstogrid(dggs.100, grid.id.100km)
 # mapview(intersect_cells_100, map.types = c("OpenStreetMap.DE"), col.regions = "pink")+
-#   mapview(intersect_cells_10, alpha = 1, col.regions = "purple")+
+#    mapview(intersect_cells_10, alpha = 1, col.regions = "purple")+
 #   mapview(pts_sf, col.regions = "black",cex = 0.2)
 
   
   #coordinates for monthly individual summaries
   id_monthly <- animlocs.1hourly |> 
-    mutate(month = month(t_),
+    mutate(month = format(t_,"%m"),
            year = year(t_),
-           month_year = paste(month,year,sep="_"))
+           month_year = paste(year,month,sep="_"))
   
   cell_info.100 <- dgGEO_to_SEQNUM(dggs.100, animlocs.1hourly$x_, animlocs.1hourly$y_)
   id_monthly$grid.id.100km <- cell_info.100$seqnum
@@ -89,16 +89,16 @@ animlocs.1hourly <- readRDS(paste0(pthamt1h,"3809257699_3809647332.rds"))
   # intersect_cells_10 <- dgcellstogrid(dggs.10, id_monthly$grid.id.10km)
   # intersect_cells_10 <- merge(intersect_cells_10,id_monthly[,c("grid.id.10km","month_year")],by.x="seqnum",by.y="grid.id.10km")
   # intersect_cells_10$month_year <- factor(intersect_cells_10$month_year)
-  
-  #mapview(intersect_cells_10, map.types = c("OpenStreetMap.DE"), zcol = "month_year")
   # 
+  # mapview(intersect_cells_10, map.types = c("OpenStreetMap.DE"), zcol = "month_year")
+  # # 
   # ggplot() +
-  #   geom_sf(data = intersect_cells_100, fill = NA, colour = "black") +
+  #   geom_sf(data = intersect_cells_10, fill = NA, colour = "black") +
   #   theme_classic() +
   #   facet_wrap(~month_year) +
   #   theme(axis.text = element_blank())
-  # 
-  # ggsave("StandardGrid/visualization/panthera leo/monthly_sum_100km.png")
+  # # 
+   ggsave("/Users/ahertel/Documents/Work/Study_MoveTraits/database v 0.0/Map/visualization_spatial_annotation/panthera leo/monthly_sum_10km.png")
   
 ## ----Resample data-------------------------------------------------------------
 #Resample data to 24h, 7 week time scales using amt
@@ -339,19 +339,40 @@ dmax7d$lat.1km <- centers$lat_deg
 rm(cell_info);rm(centers)
 }
 
-# # Visualization
-# pts_sf <- locs24h.sf |> group_by(id.year_week) |> filter(id.year_week %in% "3809647332_2009_31")
-# pts_sf2 <- mean.coord |> filter(id.year_week %in% "3809647332_2009_31") |> sf::st_as_sf(coords = c("mean.x", "mean.y"))
-# tmp1 <- dmax7d |> filter(year_week %in% "2009_31") |> dplyr::select("grid.id.10km")
-# tmp2 <- dmax7d |> filter(year_week %in% "2009_31") |> dplyr::select("grid.id.1km")
-# intersect_cells_10 <- dgcellstogrid(dggs.10, tmp1[[1]])
-# intersect_cells_1 <- dgcellstogrid(dggs.1, tmp2[[1]])
-# mapview(intersect_cells_10, map.types = c("OpenStreetMap.DE"), col.regions = "red")+
-#  mapview(intersect_cells_1, alpha = 1, col.regions = "darkred")+
-#  mapview(pts_sf, col.regions = "black")+
-#  mapview(pts_sf2, col.regions = "yellow")
+# # Visualization #3809647332_2009_31. ; 10666985_2013_34
+pts_sf <- locs24h.sf |> group_by(id.year_week) |> filter(id.year_week %in% "3809647332_2009_31")
+pts_sf2 <- mean.coord |> filter(id.year_week %in% "3809647332_2009_31") |> sf::st_as_sf(coords = c("mean.x", "mean.y"))
+tmp1 <- dmax7d |> filter(year_week %in% "2009_31") |> dplyr::select("grid.id.10km")
+tmp2 <- dmax7d |> filter(year_week %in% "2009_31") |> dplyr::select("grid.id.1km")
+intersect_cells_10 <- dgcellstogrid(dggs.10, tmp1[[1]])
+intersect_cells_1 <- dgcellstogrid(dggs.1, tmp2[[1]])
+mapview(intersect_cells_10, col.regions = "purple")+
+ mapview(intersect_cells_1, alpha = 1, col.regions = "blue")+
+ mapview(pts_sf, col.regions = "black")+
+ mapview(pts_sf2, col.regions = "yellow")
+
+
+pts_sf <- locs24h.sf |> group_by(id.year_week) |> filter(id.year_week %in% "3809647332_2009_31")
+cell_info_10 <- dgGEO_to_SEQNUM(dggs.10, 
+                                 locs24h[locs24h$year_week %in% "2009_31",]$x_, 
+                                 locs24h[locs24h$year_week %in% "2009_31",]$y_)
+cell_info_1 <- dgGEO_to_SEQNUM(dggs.1, 
+                               locs24h[locs24h$year_week %in% "2009_31",]$x_, 
+                               locs24h[locs24h$year_week %in% "2009_31",]$y_)
+intersect_cells_10 <- dgcellstogrid(dggs.10, cell_info_10[[1]])
+intersect_cells_1 <- dgcellstogrid(dggs.1, cell_info_1[[1]])
+mapview(intersect_cells_10, alpha = 1, col.regions = "purple")+
+  mapview(intersect_cells_1, col.regions = "blue")+
+  mapview(pts_sf, col.regions = "black",cex = 1)
 
 rm(mean.coord);rm(locs24h.sf)
+
+tr <- data.frame(individual_id = dmax7d[dmax7d$year_week %in% "2013_34",]$individual_id,
+           week = dmax7d[dmax7d$year_week %in% "2013_34",]$week,
+           year_week = dmax7d[dmax7d$year_week %in% "2013_34",]$year_week,
+           dmax7d = dmax7d[dmax7d$year_week %in% "2013_34",]$dmax7d,
+           grid.id.10km = paste(cell_info_10[[1]], collapse = ";"),
+           grid.id.1km = paste(cell_info_1[[1]], collapse = ";"))
 
 ## ----Maximum annual displacement distance-------------------------------------------------------------
 #' Based on daily (weekly) relocations we calculated the maximum annual displacement 
@@ -617,19 +638,56 @@ if(is.null(mcp.monthly)) NULL else {
                   grid.id.1km,  lon.1km,   lat.1km)
 }
 
-# #Visualization
-# pts_sf <- st_as_sf(dat.mcp.monthly) |> st_transform(crs=4326) |>  filter(id.month %in% "3809647332.2009_9")
-# pts_sf2 <- mean.coord |> filter(id.month %in% "3809647332.2009_9") |> sf::st_as_sf(coords = c("mean.x", "mean.y"))
-# tmp1 <- mcp.monthly |> filter(year_month %in% "2009_9") |> dplyr::select("grid.id.10km")
-# tmp2 <- mcp.monthly |> filter(year_month %in% "2009_9") |> dplyr::select("grid.id.1km")
-# intersect_cells_10 <- dgcellstogrid(dggs.10, tmp1[[1]])
-# intersect_cells_1 <- dgcellstogrid(dggs.1, tmp2[[1]])
-# poly <- mcp(dat.mcp.monthly, percent = 95, unout = c("m2"))[5,]
-# mapview(intersect_cells_10, map.types = c("OpenStreetMap.DE"), col.regions = "red")+
-#   mapview(intersect_cells_1, alpha = 1, col.regions = "darkred")+
-#   mapview(pts_sf2, col.regions = "yellow")+
-#   mapview(poly, col.regions = "gray")+
-#   mapview(pts_sf, cex= 0.2, col.regions = "black")
+# #Visualization: 3809647332.2009_9 ; 10666985.2013_8
+pts_sf <- st_as_sf(dat.mcp.monthly) |> st_transform(crs=4326) |>  filter(id.month %in% "3809647332.2009_9")
+pts_sf2 <- mean.coord |> filter(id.month %in% "3809647332.2009_9") |> sf::st_as_sf(coords = c("mean.x", "mean.y"))
+tmp1 <- mcp.monthly |> filter(year_month %in% "2009_9") |> dplyr::select("grid.id.10km")
+tmp2 <- mcp.monthly |> filter(year_month %in% "2009_9") |> dplyr::select("grid.id.1km")
+intersect_cells_10 <- dgcellstogrid(dggs.10, tmp1[[1]])
+intersect_cells_1 <- dgcellstogrid(dggs.1, tmp2[[1]])
+poly <- mcp(dat.mcp.monthly, percent = 95, unout = c("m2"))[5,]
+mapview(intersect_cells_10, col.regions = "purple")+
+  mapview(intersect_cells_1, alpha = 1, col.regions = "blue")+
+  mapview(pts_sf2, col.regions = "yellow")+
+  mapview(poly, col.regions = "gray")+
+  mapview(pts_sf, col.regions = "black")
+
+
+# 2
+pts_sf <- st_as_sf(dat.mcp.monthly) |> st_transform(crs=4326) |>  filter(id.month %in% "10666985.2013_8")
+dat <- pts_sf %>%
+  mutate(
+    x = st_coordinates(geometry)[, 1],
+    y = st_coordinates(geometry)[, 2]) %>%
+  st_drop_geometry()
+
+cell_info_10 <- dgGEO_to_SEQNUM(dggs.10, 
+                                dat[dat$id.month %in% "10666985.2013_8",]$x, 
+                                dat[dat$id.month %in% "10666985.2013_8",]$y)
+cell_info_1 <- dgGEO_to_SEQNUM(dggs.1, 
+                               dat[dat$id.month %in% "10666985.2013_8",]$x, 
+                               dat[dat$id.month %in% "10666985.2013_8",]$y)
+intersect_cells_10 <- dgcellstogrid(dggs.10, cell_info_10[[1]])
+intersect_cells_1 <- dgcellstogrid(dggs.1, cell_info_1[[1]])
+mapview(intersect_cells_10, alpha = 1, col.regions = "purple")+
+  mapview(intersect_cells_1, col.regions = "blue")+
+  mapview(poly, col.regions = "gray")+
+  mapview(pts_sf, col.regions = "black",cex = 1)
+
+# 2
+poly2 <- st_as_sf(poly) |> st_transform(crs=4326) 
+pts_sample <- st_sample(poly2, size=10000, type="regular")  # Dense regular grid
+seqnums_sample <- dgGEO_to_SEQNUM(dggs.10, st_coordinates(pts_sample)[,1],
+                                st_coordinates(pts_sample)[,2])
+intersect_cells_10 <- dgcellstogrid(dggs.10, seqnums_sample[[1]])
+
+seqnums_sample <- dgGEO_to_SEQNUM(dggs.1, st_coordinates(pts_sample)[,1],
+                                  st_coordinates(pts_sample)[,2])
+intersect_cells_1 <- dgcellstogrid(dggs.1, seqnums_sample[[1]])
+
+mapview(intersect_cells_10, alpha = 1, col.regions = "purple")+
+  mapview(intersect_cells_1, col.regions = "blue")+
+  mapview(poly, col.regions = "gray")
 
 rm(dat.mcp.monthly);rm(mean.coord)
 
