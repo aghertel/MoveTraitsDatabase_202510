@@ -18,7 +18,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r packages, warning=FALSE,message=FALSE}
-library(tidyverse);library(bit64); library(geodata);library(dggridR);library(terra); library(sf);library(terra); library(mapview);library(RColorBrewer)
+library(tidyverse);library(bit64); library(geodata);library(dggridR);library(terra); library(sf); library(mapview);library(RColorBrewer);library(dplyr);library(stringr);library(purrr)
 ```
 
 # Download the database
@@ -76,7 +76,8 @@ ggplot() +
 ## Individual level
 
 ```{r}
-MoveTrait.v0.1.ind <- readRDS("DATA/5.MB_indv_traitsum/10596067_10666985.rds")
+#MoveTrait.v0.1.ind <- readRDS("DATA/5.MB_indv_traitsum/10596067_10666985.rds")
+MoveTrait.v0.1.ind <- readRDS("updates_work_in_progress/DATA/5.MB_indv_traitsum/10596067_10666985.rds")
 ```
 
 The individual level database follows the same structure as the species level database. But contains more individual level information:
@@ -147,7 +148,7 @@ mapview(intersect_cells_100, map.types = c("OpenStreetMap.DE"),
 ## Monthly summary
 
 ```{r}
-MoveTrait.v0.1.month <- readRDS("DATA/6.MB_indv_monthly_traitsum/10596067_10666985.rds")
+MoveTrait.v0.1.month <- readRDS("updates_work_in_progress/DATA/6.MB_indv_monthly_traitsum/10596067_10666985.rds")
 ```
 
 In the monthly summary we have summarized traits for each tracking month. These summaries can be spatially referenced using the grid.id.100km and grid.id.10km columns.
@@ -218,7 +219,7 @@ head(centroids)
 ### How individual repeated trait measures will be annotated is still up for discussion!!
 
 ```{r}
-MoveTrait.v0.1_rep.ind <- readRDS("DATA/7.MB_indv_trait/10596067_10666985.rds")
+MoveTrait.v0.1_rep.ind <- readRDS("updates_work_in_progress/DATA/7.MB_indv_trait/10596067_10666985.rds")
 ```
 
 The third level of the database provides repeated individual trait measures. For each individual and every trait we provide the underlying repeated trait measures as a list of nested dataframes in columns 3 - 12
@@ -231,13 +232,13 @@ class(MoveTrait.v0.1_rep.ind[,5])
 The underlying distribution for the trait "dmax24h" (maximum 24hr displacement) in column five, for the first individual in the database can be accessed in the following way. 
 
 ```{r}
-MoveTrait.v0.1_rep.ind[,12][[1]]
+MoveTrait.v0.1_rep.ind[,5][[1]]
 ```
 
 For open access data, it contains the mean latitude and longitude of the particular day when the trait was measured. For closed access data it contains the identity of the grid cell that contains the mean coordinate, at either 10km, or 10 and 1km resolution, depending on the data owner's sharing selection. Only one coordinate is associated with every repeated trait measure and it is easy to link these back to the grid cell centroids.
 
 ```{r}
-example.displ24h <-data.frame(MoveTrait.v0.1_rep.ind[,][[1]])
+example.displ24h <-data.frame(MoveTrait.v0.1_rep.ind[,5][[1]])
 ```
 
 These centroids can be directly used to extract information from environmental layers.
@@ -259,4 +260,95 @@ mapview(intersect_cells_10,
 
 ```
 
+
+## Home range - from vertices to home range polygons
+
+```{r}
+example.mcp1m <-data.frame(MoveTrait.v0.1_rep.ind[,9][[1]])
+names(example.mcp1m)
+```
+
+Range sizes are calculated as 95% Minimum Convex Polygon of all GPS locations in a given time frame (e.g., within one day, month, or year). 
+
+For open access data, range sizes are annotated with vertex coordinates which can be directly transformed back into the MCP polygon. 
+Alternatively, these vertex coordinates are diffused at 1 or 10 km allowing to reproduce the home range at a courser scale. 
+
+### Observation level data
+Function to reproduce home ranges for individuals with observation level data.
+```{r}
+vertices_to_polygon <- function(x_vertices, y_vertices) {
+  x <- as.numeric(str_split(x_vertices, ";", simplify = TRUE))
+  y <- as.numeric(str_split(y_vertices, ";", simplify = TRUE))
+  
+  coords <- cbind(x, y)
+  coords <- coords[complete.cases(coords), , drop = FALSE]
+  
+  if (!all(coords[1, ] == coords[nrow(coords), ])) {
+    coords <- rbind(coords, coords[1, , drop = FALSE])
+  }
+  
+  st_polygon(list(coords))
+}
+```
+
+```{r}
+mcp_observation <- example.mcp1m %>%
+  mutate(
+    geometry = map2(x_vertices, y_vertices, vertices_to_polygon),
+    month = as.factor(month)) %>%
+  st_as_sf(sf_column_name = "geometry", crs = 4326)
+```
+
+```{r}
+mapview(mcp_observation,
+        zcol = "month",
+        col.regions = colorRampPalette(rev(brewer.pal(11, "RdYlBu"))))
+```
+
+### Diffused grid cell data to Range polygon
+
+1. unpack the grid cell vertices of the range. Vertices are stored in column "grid.id.10km" or "grid.id.1km" into long format.
+```{r}
+cells_long <- example.mcp1m %>%
+  dplyr::select(id, month, year_month, area, grid.id.10km)  |> 
+  separate_rows(grid.id.10km, sep = ";") |> 
+  filter(!is.na(grid.id.10km), grid.id.10km != "") |> 
+  mutate(grid.id.10km = as.integer(grid.id.10km),
+         month = as.factor(month))
+
+head(cells_long)
+```
+
+2. extract the grid cell boundaries of the vertices 
+```{r}
+grid_sf <- dgcellstogrid(dggs.10, cells_long$grid.id.10km) |> 
+  left_join(cells_long,month, by = c("seqnum" = "grid.id.10km"))
+
+mapview(grid_sf[grid_sf$month==10,],
+        col.regions = colorRampPalette(rev(brewer.pal(11, "RdYlBu"))))
+```
+
+3. recreate the MCP based on the grid cells
+```{r}
+mcp_10km <- grid_sf %>%
+  group_by(month) %>%
+  summarise(geometry = st_union(geometry), .groups = "drop") |> 
+  mutate(geometry = st_convex_hull(geometry))
+
+mapview(grid_sf[grid_sf$month==10,],
+        col.regions = colorRampPalette(rev(brewer.pal(11, "RdYlBu")))) +
+  mapview(mcp_10km[mcp_10km$month == 10,])
+```
+
+4. Annotate ranges with environmental covariates
+
+The polygons created either from observation level cooridnates or from grid cells can then be used to annotate traits with environmental layers.
+```{r}
+mcp_10km$hfi.mean <- terra::extract(hfi, terra::vect(mcp_10km), fun = mean, na.rm = TRUE)[, 2]
+```
+
+```{r}
+mapview(mcp_10km,
+        zcol = "hfi.mean")
+```
 
