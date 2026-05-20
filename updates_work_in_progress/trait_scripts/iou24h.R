@@ -2,10 +2,8 @@
 calc_iou24h <- function(area,
                         trk,
                         dggs_10, 
-                        dggs_1, 
-                        min_weeks_n = 36) 
+                        dggs_1) 
 {
-  
 tmp.mcp24h <- 
   if(is.null(area)) NULL else {
     area|>
@@ -43,7 +41,6 @@ if(is.null(iou24h)) NULL else {
   iou24h$lat.1km <- centers_1$lat_deg
 
 }
-rm(cell_info_10);rm(centers_1);  rm(cell_info_1);rm(centers_10);rm(tmp.mcp24h)
 return(iou24h)
 }
 

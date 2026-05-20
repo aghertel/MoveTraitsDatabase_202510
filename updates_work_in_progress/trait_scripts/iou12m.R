@@ -3,11 +3,8 @@
 calc_iou12m <- function(area,
                         trk,
                         dggs_10, 
-                        dggs_1, 
-                        min_weeks_n = 36) 
+                        dggs_1) 
 {
- area <-mcp12m
- trk <-d24h
 
 tmp.mcp12m <- 
   if(is.null(area)) NULL else {
@@ -23,7 +20,7 @@ iou12m <-
              mean.x = mean(lon),
              mean.y = mean(lat)) |>  
       dplyr::select(id_year,year,individual_id,cumsum.d24h,mean.x,mean.y) |>  distinct() |> 
-      left_join(tmp.mcp12m[,c("id.year","area")],by = c("id_year"="id.year")) |>  
+      left_join(tmp.mcp12m[,c("id_year","area")],by = "id_year") |>  
       mutate(iou12m = cumsum.d24h/sqrt(area)) |> 
       filter(!is.na(iou12m)) |>  ungroup() |> 
     dplyr::select(individual_id,year,iou12m,mean.x,mean.y)
@@ -43,9 +40,6 @@ if(is.null(iou12m)) NULL else {
   centers_1 <- dgSEQNUM_to_GEO(dggs.1, iou12m$grid.id.1km)
   iou12m$lon.1km <- centers_1$lon_deg
   iou12m$lat.1km <- centers_1$lat_deg
-  
-  rm(cell_info_1);rm(centers_1)  
-  rm(cell_info_10);rm(centers_10)
   
 }
 return(iou12m)

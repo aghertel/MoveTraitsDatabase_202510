@@ -63,10 +63,6 @@ if(is.null(dmax7d)) NULL else {
   dmax7d$lon.1km <- centers_1$lon_deg
   dmax7d$lat.1km <- centers_1$lat_deg
 
-  rm(moveObjSplitTime);rm(maxNetDispL)
-  rm(mean.coord);rm(locs24h.sf)
-  rm(cell_info_10);rm(centers_10);rm(cell_info_1);rm(centers_1)
-  
 }
 return(dmax7d)
 }

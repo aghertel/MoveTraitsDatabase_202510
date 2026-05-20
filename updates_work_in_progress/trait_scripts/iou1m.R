@@ -2,11 +2,9 @@
 calc_iou1m <- function(area,
                         trk,
                         dggs_10, 
-                        dggs_1, 
-                        min_weeks_n = 36) 
+                        dggs_1) 
 {
   tmp.mcp1m <- 
-
     if(is.null(area)) NULL else {
     area|>
       mutate(id_month = paste(individual_id,year_month,sep="."))
@@ -44,8 +42,6 @@ if(is.null(iou1m)) NULL else {
   iou1m$lon.1km <- centers_1$lon_deg
   iou1m$lat.1km <- centers_1$lat_deg
 }
-rm(cell_info_10);rm(centers_10)
-rm(cell_info_1);rm(centers_1)
 
 return(iou1m)
 }
