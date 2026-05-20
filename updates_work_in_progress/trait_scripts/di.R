@@ -53,7 +53,7 @@ di <-
                 dist.sum.night = sum(d1h[daytime=="night"]),
                 dist.length.day = sum(daytime=="day"),
                 dist.length.night = sum(daytime=="night"),
-                total.daylength = dist.length.day + dist.length.night) |> 
+                total.daylength = dist.length.day + dist.length.night, .groups = "drop_last") |> 
       data.frame()
     
     di$diurnality <- f.diurn(di$dist.sum.day, di$dist.length.day, di$dist.sum.night, 
@@ -85,7 +85,6 @@ if(is.null(di)) NULL else {
   di$lat.1km <- centers_1$lat_deg
  
 }
-rm(cell_info_10);rm(centers_10);rm(cell_info_1);rm(centers_1);rm(mean.coord)
 return(di)
 }
 
