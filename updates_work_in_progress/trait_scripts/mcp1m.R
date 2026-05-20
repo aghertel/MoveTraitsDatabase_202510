@@ -3,16 +3,53 @@ crs_4326  <- sp::CRS("EPSG:4326")
 crs_moll <- sp::CRS("+proj=moll +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs +type=crs")
 
 ## ----Function to get corner coordinates (vertices)-------------------------------------------------------------
+# get_polygon_vertices <- function(mcp_spdf) {
+#   out <- lapply(seq_along(mcp_spdf@polygons), function(i) {
+#     coords <- mcp_spdf@polygons[[i]]@Polygons[[1]]@coords
+#     if (all(coords[1, ] == coords[nrow(coords), ])) {
+#       coords <- coords[-nrow(coords), , drop = FALSE]
+#     }
+#     
+#     tmp <- SpatialPoints(coords, proj4string = crs_moll)
+#     tmp_ll <- spTransform(tmp, crs_4326)
+#     coords_ll <- coordinates(tmp_ll)
+#     
+#     data.frame(
+#       id = mcp_spdf@data$id[i],
+#       x_vertices = paste(coords_ll[, 1], collapse = ";"),
+#       y_vertices = paste(coords_ll[, 2], collapse = ";"),
+#       stringsAsFactors = FALSE
+#     )
+#   })
+#   do.call(rbind, out)
+# }
+
 get_polygon_vertices <- function(mcp_spdf) {
+  if (is.null(mcp_spdf) || length(mcp_spdf@polygons) == 0) return(NULL)
+  
   out <- lapply(seq_along(mcp_spdf@polygons), function(i) {
-    coords <- mcp_spdf@polygons[[i]]@Polygons[[1]]@coords
+    poly <- mcp_spdf@polygons[[i]]
+    if (length(poly@Polygons) == 0) return(NULL)
+    
+    coords <- poly@Polygons[[1]]@coords
+    if (is.null(coords) || nrow(coords) < 3) return(NULL)
+    
     if (all(coords[1, ] == coords[nrow(coords), ])) {
       coords <- coords[-nrow(coords), , drop = FALSE]
     }
+    if (nrow(coords) < 3) return(NULL)
     
-    tmp <- SpatialPoints(coords, proj4string = crs_moll)
-    tmp_ll <- spTransform(tmp, crs_4326)
-    coords_ll <- coordinates(tmp_ll)
+    tmp <- sp::SpatialPoints(coords, proj4string = crs_moll)
+    if (length(tmp) == 0) return(NULL)
+    
+    tmp_ll <- tryCatch(
+      sp::spTransform(tmp, crs_4326),
+      error = function(e) NULL
+    )
+    if (is.null(tmp_ll)) return(NULL)
+    
+    coords_ll <- sp::coordinates(tmp_ll)
+    if (is.null(coords_ll) || nrow(coords_ll) < 3) return(NULL)
     
     data.frame(
       id = mcp_spdf@data$id[i],
@@ -21,6 +58,10 @@ get_polygon_vertices <- function(mcp_spdf) {
       stringsAsFactors = FALSE
     )
   })
+  
+  out <- Filter(Negate(is.null), out)
+  if (length(out) == 0) return(NULL)
+  
   do.call(rbind, out)
 }
 
@@ -28,9 +69,8 @@ get_polygon_vertices <- function(mcp_spdf) {
 calc_mcp1m <- function(trk, 
                        dggs_10, 
                        dggs_1, 
-                       min_days_n = 14) 
+                       min_days_n = 18) 
 {
-  #trk <- animlocs.daily
   dat.mcp.monthly <- trk %>% 
   tibble() %>% 
   mutate(month = as.numeric(strftime(t_,format="%m")), 
