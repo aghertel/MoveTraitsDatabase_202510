@@ -6,7 +6,6 @@ calc_dmax24h <- function(trk,
                          min_daily_n = 12, 
                          min_ymd_n = 7) 
   {
-  
 locs1h <- trk %>% 
   mutate(ymd = as.character(format(as.Date(t_), "%Y-%m-%d"))) |> 
   mutate(id.ymd = paste(individual_id,ymd,sep="_")) |> 
@@ -16,60 +15,55 @@ locs1h <- trk %>%
 
 if (nrow(locs1h) == 0) return(NULL)
 
-# Calculate mean coordinates per day
-mean.coord <- locs1h |> group_by(id.ymd) |> 
-  mutate(mean.x = mean(x_, na.rm=T),
-         mean.y = mean(y_, na.rm=T)) |> 
-  dplyr::select(id.ymd, mean.x, mean.y) |> distinct()
-
 # Convert to sf and calculate max pairwise distance per day
 locs1h.sf <- sf::st_as_sf(locs1h,
                           coords = c("x_", "y_"),
                           crs = 4326)
 
-moveObjSplitTime <- split(locs1h.sf, locs1h$id.ymd)
-maxNetDispL <- lapply(moveObjSplitTime, function(x){max(sf::st_distance(x))})
-maxNetDisp <- do.call("rbind",maxNetDispL)
+dmax24h <- split(locs1h.sf, locs1h.sf$id.ymd) |>
+  imap_dfr(function(x, nm) {
+    d <- sf::st_distance(x)
+    diag(d) <- NA
+    idx <- which(d == max(d, na.rm = TRUE), arr.ind = TRUE)[1, ]
+    
+    coords <- st_coordinates(x)
+    
+    tibble(
+      id.ymd = nm,
+      dmax24h = as.numeric(d[idx[1], idx[2]]),
+      lon_start = coords[idx[1], "X"],
+      lat_start = coords[idx[1], "Y"],
+      lon_end = coords[idx[2], "X"],
+      lat_end = coords[idx[2], "Y"]
+    )
+  })
 
-# Process results
-dmax24 <- 
-  if(is.null(maxNetDisp)) NULL else {
-    data.frame(keyName=row.names(maxNetDisp), dmax24h=maxNetDisp[,1], row.names=NULL) |> 
-      mutate(ymd = str_split(keyName, "_", simplify = TRUE)[,2],
-             individual_id = str_split(keyName, "_", simplify = TRUE)[,1]) |> 
-      filter(!is.na(dmax24h)) |>  
-      group_by(individual_id) |>  
-      filter(n() >= 7) %>%
-      ungroup() |> 
-      mutate(id.ymd = paste(individual_id,ymd,sep="_")) |> 
-      left_join(mean.coord, by = "id.ymd") |> 
-      dplyr::select(individual_id,ymd,dmax24h, mean.x, mean.y) }
+dmax24h <- 
+  dmax24h |> 
+  mutate(ymd = str_split(id.ymd, "_", simplify = TRUE)[,2],
+        individual_id = str_split(id.ymd, "_", simplify = TRUE)[,1])|> 
+  filter(!is.na(dmax24h)) |> 
+  dplyr::select(individual_id,ymd,dmax24h,lon_start, lat_start, lon_end, lat_end)
 
   # Final NULL checks
-  if (is.null(dmax24) || nrow(dmax24) == 0) return(NULL)
+  if (is.null(dmax24h) || nrow(dmax24h) == 0) return(NULL)
  
-if(is.null(dmax24)) NULL else {
+if(is.null(dmax24h)) NULL else {
   # Spatial annotation 10km
-  cell_info_10 <- dgGEO_to_SEQNUM(dggs.10, mean.coord$mean.x, mean.coord$mean.y)
-  dmax24$grid.id.10km <- cell_info_10$seqnum
-  centers_10 <- dgSEQNUM_to_GEO(dggs.10, dmax24$grid.id.10km)
-  dmax24$lon.10km <- centers_10$lon_deg
-  dmax24$lat.10km <- centers_10$lat_deg
+  cell_info_10.a <- dgGEO_to_SEQNUM(dggs.10, dmax24h$lon_start, dmax24h$lat_start)
+  cell_info_10.b <- dgGEO_to_SEQNUM(dggs.10, dmax24h$lon_end, dmax24h$lat_end)
+  dmax24h$grid.id.10km <- cell_info_10.a$seqnum
+  dmax24h$grid.id.10km <- paste(dmax24h$grid.id.10km,cell_info_10.b$seqnum,sep=";")
   
   # Spatial annotation 1km
-  cell_info_1 <- dgGEO_to_SEQNUM(dggs.1, mean.coord$mean.x, mean.coord$mean.y)
-  dmax24$grid.id.1km <- cell_info_1$seqnum
-  centers_1 <- dgSEQNUM_to_GEO(dggs.1, dmax24$grid.id.1km)
-  dmax24$lon.1km <- centers_1$lon_deg
-  dmax24$lat.1km <- centers_1$lat_deg
+  cell_info_1.a <- dgGEO_to_SEQNUM(dggs.1, dmax24h$lon_start, dmax24h$lat_start)
+  cell_info_1.b <- dgGEO_to_SEQNUM(dggs.1, dmax24h$lon_end, dmax24h$lat_end)
+  dmax24h$grid.id.1km <- cell_info_1.a$seqnum
+  dmax24h$grid.id.1km <- paste(dmax24h$grid.id.1km,cell_info_1.b$seqnum,sep=";")
+  
+  rm(locs1h.sf)
 }
-
-return(dmax24)
-
-rm(moveObjSplitTime);rm(maxNetDispL);rm(maxNetDisp)
-rm(mean.coord);rm(locs1h.sf);rm(cell_info_1);rm(cell_info_10);
-rm(centers_10);rm(centers_1)
-
+return(dmax24h)
 }
 
 # ----summarize dmax24h at individual level
