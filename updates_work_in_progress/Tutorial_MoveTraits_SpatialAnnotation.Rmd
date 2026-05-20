@@ -219,7 +219,7 @@ head(centroids)
 ### How individual repeated trait measures will be annotated is still up for discussion!!
 
 ```{r}
-MoveTrait.v0.1_rep.ind <- readRDS("updates_work_in_progress/DATA/7.MB_indv_trait/10596067_10666985.rds")
+MoveTrait.v0.1_rep.ind <- readRDS("updates_work_in_progress/DATA/7.MB_indv_trait/3809257699_3809647332.rds")
 ```
 
 The third level of the database provides repeated individual trait measures. For each individual and every trait we provide the underlying repeated trait measures as a list of nested dataframes in columns 3 - 12
@@ -232,13 +232,15 @@ class(MoveTrait.v0.1_rep.ind[,5])
 The underlying distribution for the trait "dmax24h" (maximum 24hr displacement) in column five, for the first individual in the database can be accessed in the following way. 
 
 ```{r}
-MoveTrait.v0.1_rep.ind[,5][[1]]
+MoveTrait.v0.1_rep.ind[,4][[1]]
 ```
 
 For open access data, it contains the mean latitude and longitude of the particular day when the trait was measured. For closed access data it contains the identity of the grid cell that contains the mean coordinate, at either 10km, or 10 and 1km resolution, depending on the data owner's sharing selection. Only one coordinate is associated with every repeated trait measure and it is easy to link these back to the grid cell centroids.
 
 ```{r}
-example.displ24h <-data.frame(MoveTrait.v0.1_rep.ind[,5][[1]])
+example.displ24h <-data.frame(MoveTrait.v0.1_rep.ind[,4][[1]])
+
+example.displ24h <- example.displ24h[,c(1,4,5,6,7,10)]
 ```
 
 These centroids can be directly used to extract information from environmental layers.
@@ -257,7 +259,6 @@ intersect_cells_10 <- intersect_cells_10 |>
 mapview(intersect_cells_10,
         zcol = "wildareas.v3.2009.human.footprint",
         col.regions = colorRampPalette(rev(brewer.pal(11, "RdYlBu"))))
-
 ```
 
 
@@ -314,7 +315,7 @@ cells_long <- example.mcp1m %>%
   separate_rows(grid.id.10km, sep = ";") |> 
   filter(!is.na(grid.id.10km), grid.id.10km != "") |> 
   mutate(grid.id.10km = as.integer(grid.id.10km),
-         month = as.factor(month))
+         year_month = as.factor(year_month))
 
 head(cells_long)
 ```
@@ -322,22 +323,26 @@ head(cells_long)
 2. extract the grid cell boundaries of the vertices 
 ```{r}
 grid_sf <- dgcellstogrid(dggs.10, cells_long$grid.id.10km) |> 
-  left_join(cells_long,month, by = c("seqnum" = "grid.id.10km"))
+  left_join(cells_long,year_month, by = c("seqnum" = "grid.id.10km"))
 
-mapview(grid_sf[grid_sf$month==10,],
-        col.regions = colorRampPalette(rev(brewer.pal(11, "RdYlBu"))))
+mapview(grid_sf[grid_sf$year_month=="2010_10",],
+        col.regions = colorRampPalette(rev(brewer.pal(11, "RdYlBu")))) 
+
 ```
 
 3. recreate the MCP based on the grid cells
 ```{r}
 mcp_10km <- grid_sf %>%
-  group_by(month) %>%
+  group_by(year_month) %>%
   summarise(geometry = st_union(geometry), .groups = "drop") |> 
   mutate(geometry = st_convex_hull(geometry))
 
-mapview(grid_sf[grid_sf$month==10,],
-        col.regions = colorRampPalette(rev(brewer.pal(11, "RdYlBu")))) +
-  mapview(mcp_10km[mcp_10km$month == 10,])
+mapview(grid_sf[grid_sf$year_month=="2010_10",],
+        alpha.regions = 0,    
+        color = "red",        
+        lwd = 2) +
+  mapview(mcp_10km[mcp_10km$year_month == "2010_10",],
+          layer.name = "Derived MCP") 
 ```
 
 4. Annotate ranges with environmental covariates
@@ -352,3 +357,45 @@ mapview(mcp_10km,
         zcol = "hfi.mean")
 ```
 
+## Maximum displacement
+
+Maximum displacement distance is calcualted at the daily, monthly, and annual scale.
+It is annotated wit the endpoint coordinates -  or with the grid cells intersecting the end points. These can be recreated using the following code.
+
+```{r}
+example.dmax12m <-data.frame(MoveTrait.v0.1_rep.ind[,7][[1]])
+names(example.dmax12m)
+head(example.dmax12m)
+```
+
+
+```{r}
+example.dmax12m_long <- example.dmax12m %>%
+    filter(year == 2010) |> 
+  mutate(
+    grid.id.10km_start = str_split_fixed(grid.id.10km, ";", 2)[,1],
+    grid.id.10km_end = str_split_fixed(grid.id.10km, ";", 2)[,2],
+    grid.id.1km_start = str_split_fixed(grid.id.1km, ";", 2)[,1],
+    grid.id.1km_end = str_split_fixed(grid.id.1km, ";", 2)[,2]
+  ) %>%
+  dplyr::select(-grid.id.10km, -grid.id.1km) %>%
+  pivot_longer(
+    cols = c(lon_start, lon_end, lat_start, lat_end,
+             grid.id.10km_start, grid.id.10km_end,
+             grid.id.1km_start, grid.id.1km_end),
+    names_to = c(".value", "point"),
+    names_pattern = "([a-z0-9_.]+)_(start|end)"
+  ) |> 
+  mutate(grid.id.10km = as.numeric(grid.id.10km),
+         grid.id.1km = as.numeric(grid.id.1km))
+
+endpoint_sf <- st_as_sf(example.dmax12m_long, coords = c("lon", "lat"), crs = 4326)
+```
+
+2. extract the grid cell boundaries of the endpoints 
+```{r}
+grid_sf <- dgcellstogrid(dggs.10, example.dmax12m_long$grid.id.10km)
+
+mapview(endpoint_sf, layer.name = "Observed endpoint locs") +
+  mapview(grid_sf,alpha.regions = 0, color = "red",lwd = 2) 
+```
