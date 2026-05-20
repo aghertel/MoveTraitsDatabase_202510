@@ -32,16 +32,16 @@ calc_d24h <- function(trk,
   # Spatial annotation 10km
   cell_info <- dgGEO_to_SEQNUM(dggs.10, out$lon, out$lat)
   out$grid.id.10km <- cell_info$seqnum
-  centers <- dgSEQNUM_to_GEO(dggs.10, out$grid.id.10km)
-  out$lon.10km <- centers$lon_deg
-  out$lat.10km <- centers$lat_deg
+  # centers <- dgSEQNUM_to_GEO(dggs.10, out$grid.id.10km)
+  # out$lon.10km <- centers$lon_deg
+  # out$lat.10km <- centers$lat_deg
   
   # Spatial annotation 1km
   cell_info <- dgGEO_to_SEQNUM(dggs.1, out$lon, out$lat)
   out$grid.id.1km <- cell_info$seqnum
-  centers <- dgSEQNUM_to_GEO(dggs.1, out$grid.id.1km)
-  out$lon.1km <- centers$lon_deg
-  out$lat.1km <- centers$lat_deg
+  # centers <- dgSEQNUM_to_GEO(dggs.1, out$grid.id.1km)
+  # out$lon.1km <- centers$lon_deg
+  # out$lat.1km <- centers$lat_deg
   
   out
 }

@@ -28,16 +28,16 @@ calc_d1h <- function(trk,
   # spatial annotation 10 km
   cell_info_10 <- dgGEO_to_SEQNUM(dggs_10, out$lon, out$lat)
   out$grid.id.10km <- cell_info_10$seqnum
-  centers_10 <- dgSEQNUM_to_GEO(dggs_10, out$grid.id.10km)
-  out$lon.10km <- centers_10$lon_deg
-  out$lat.10km <- centers_10$lat_deg
+  # centers_10 <- dgSEQNUM_to_GEO(dggs_10, out$grid.id.10km)
+  # out$lon.10km <- centers_10$lon_deg
+  # out$lat.10km <- centers_10$lat_deg
   
   # spatial annotation 1 km
   cell_info_1 <- dgGEO_to_SEQNUM(dggs_1, out$lon, out$lat)
   out$grid.id.1km <- cell_info_1$seqnum
-  centers_1 <- dgSEQNUM_to_GEO(dggs_1, out$grid.id.1km)
-  out$lon.1km <- centers_1$lon_deg
-  out$lat.1km <- centers_1$lat_deg
+  # centers_1 <- dgSEQNUM_to_GEO(dggs_1, out$grid.id.1km)
+  # out$lon.1km <- centers_1$lon_deg
+  # out$lat.1km <- centers_1$lat_deg
   
   out
 }
