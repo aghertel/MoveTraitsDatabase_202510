@@ -1,76 +1,80 @@
 
 ## ----Maximum annual displacement distance-------------------------------------------------------------
-#' Based on daily (weekly) relocations we calculated the maximum annual displacement 
-#' distance from all pairwise comparisons. We included only individuals with at least 36 weeks (9 months) of data
+# Based on daily relocations we calculated the maximum annual displacement 
+
+# the animal hast to have data recorded in at least 9 months of the year
+# minimum daily locations - 100
 
 calc_dmax12m <- function(trk, 
                          dggs_10, 
                          dggs_1, 
-                         min_weeks_n = 36) 
+                         min_locs_n = 150,
+                         min_months = 9) 
 {
-  
-locs7d <- trk %>%
+  locs24h <- trk %>%
   mutate(year = as.numeric(strftime(t_,format="%Y")),
-         id.year = paste(individual_id,year,sep="_")) |>   
-  group_by(id.year)  |> filter(n() >= min_weeks_n) |> ungroup()
+         month = as.numeric(strftime(t_,format="%m")),
+         id.year = paste(individual_id,year,sep="_")) |> 
+  group_by(individual_id, year) |> mutate(n_months = n_distinct(month)) |> 
+  ungroup() |>   filter(n_months >= min_months) |>
+  group_by(id.year)  |> filter(n() >= min_locs_n) |> ungroup() |> 
+  dplyr::select(-c(n_months))
 
-if (nrow(locs7d) == 0) return(NULL)
-
-# Calculate mean coordinates per day
-mean.coord <- locs7d |> group_by(id.year) |> 
-  mutate(mean.x = mean(x_, na.rm=T),
-         mean.y = mean(y_, na.rm=T)) |> 
-  dplyr::select(id.year, mean.x, mean.y) |> distinct()
+if (nrow(locs24h) == 0) return(NULL)
 
 # Convert to sf and calculate max pairwise distance per day
-locs7d.sf <- sf::st_as_sf(locs7d,
+locs24h.sf <- sf::st_as_sf(locs24h,
                           coords = c("x_", "y_"),
                           crs = 4326)
 
-moveObjSplitTime <- split(locs7d.sf, locs7d.sf$id.year)
-maxNetDispL <- lapply(moveObjSplitTime, function(x){max(sf::st_distance(x))})
-maxNetDisp <- do.call("rbind",maxNetDispL)
+dmax12m <- split(locs24h.sf, locs24h.sf$id.year) |>
+  imap_dfr(function(x, nm) {
+    d <- st_distance(x)
+    diag(d) <- NA
+    idx <- which(d == max(d, na.rm = TRUE), arr.ind = TRUE)[1, ]
+    
+    coords <- st_coordinates(x)
+    
+    tibble(
+      id.year = nm,
+      dmax12m = as.numeric(d[idx[1], idx[2]]),
+      lon_start = coords[idx[1], "X"],
+      lat_start = coords[idx[1], "Y"],
+      lon_end = coords[idx[2], "X"],
+      lat_end = coords[idx[2], "Y"]
+    )
+  })
 
-# Process results
 dmax12m <- 
-  if(is.null(maxNetDisp)) NULL else {
-    data.frame(keyName=row.names(maxNetDisp), dmax12m=maxNetDisp[,1], row.names=NULL) |> 
-      filter(!is.na(dmax12m)) |> 
-      mutate(year = str_split(keyName, "_", simplify = TRUE)[,2],
-             individual_id = str_split(keyName, "_", simplify = TRUE)[,1]) |> 
-      mutate(id.year = paste(individual_id,year,sep="_")) |>  
-      left_join(mean.coord, by = "id.year") |> 
-      dplyr::select(individual_id,year,dmax12m,mean.x, mean.y) }
+  dmax12m |> 
+  mutate(year = str_split(id.year, "_", simplify = TRUE)[,2],
+         individual_id = str_split(id.year, "_", simplify = TRUE)[,1]) |> 
+  filter(!is.na(dmax12m)) |> 
+  dplyr::select(individual_id,year,dmax12m, lon_start, lat_start, lon_end, lat_end)
 
 # Final NULL checks
 if (is.null(dmax12m) || nrow(dmax12m) == 0) return(NULL)
 
 if(is.null(dmax12m)) NULL else {
   # Spatial annotation 10km
-  cell_info_10 <- dgGEO_to_SEQNUM(dggs.10, mean.coord$mean.x, mean.coord$mean.y)
-  dmax12m$grid.id.10km <- cell_info_10$seqnum
-  centers_10 <- dgSEQNUM_to_GEO(dggs.10, dmax12m$grid.id.10km)
-  dmax12m$lon.10km <- centers_10$lon_deg
-  dmax12m$lat.10km <- centers_10$lat_deg
+  cell_info_10.a <- dgGEO_to_SEQNUM(dggs.10, dmax12m$lon_start, dmax12m$lat_start)
+  cell_info_10.b <- dgGEO_to_SEQNUM(dggs.10, dmax12m$lon_end, dmax12m$lat_end)
+  dmax12m$grid.id.10km <- cell_info_10.a$seqnum
+  dmax12m$grid.id.10km <- paste(dmax12m$grid.id.10km,cell_info_10.b$seqnum,sep=";")
   
   # Spatial annotation 1km
-  cell_info_1 <- dgGEO_to_SEQNUM(dggs.1, mean.coord$mean.x, mean.coord$mean.y)
-  dmax12m$grid.id.1km <- cell_info_1$seqnum
-  centers_1 <- dgSEQNUM_to_GEO(dggs.1, dmax12m$grid.id.1km)
-  dmax12m$lon.1km <- centers_1$lon_deg
-  dmax12m$lat.1km <- centers_1$lat_deg
+  cell_info_1.a <- dgGEO_to_SEQNUM(dggs.1, dmax12m$lon_start, dmax12m$lat_start)
+  cell_info_1.b <- dgGEO_to_SEQNUM(dggs.1, dmax12m$lon_end, dmax12m$lat_end)
+  dmax12m$grid.id.1km <- cell_info_1.a$seqnum
+  dmax12m$grid.id.1km <- paste(dmax12m$grid.id.1km,cell_info_1.b$seqnum,sep=";")
+  
+  rm(locs24h.sf)
   
 }
+
 return(dmax12m)
 
-rm(cell_info);rm(centers)
-rm(cell_info_10);rm(centers_10)
-rm(mean.coord);rm(locs7d.sf)
-rm(moveObjSplitTime);rm(maxNetDispL);rm(locs7d)
-
 }
-
-
 
 ## ----function to summarize Max12m Displacements------
 f_sum.ind.dmax12m<-function(x)
