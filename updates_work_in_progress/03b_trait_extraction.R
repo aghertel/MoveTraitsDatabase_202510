@@ -6,17 +6,16 @@
 
 library(lubridate);library(metafor);library(tidyverse);library(amt);
 library(adehabitatHR); library(move2); library(epitools); library(suncalc); library(purrr); library(bit64)
-library(dggridR);library(mapview);library(ISOweek)
+library(dggridR);library(mapview);library(ISOweek);library(sf)
 
 ## ----Import functions for traits-------------------------------------------------------------
 
 source(here::here('updates_work_in_progress/trait_scripts', 'd1h.R'))
 source(here::here('updates_work_in_progress/trait_scripts', 'd24h.R'))
 source(here::here('updates_work_in_progress/trait_scripts', 'dmax24h.R'))
-source(here::here('updates_work_in_progress/trait_scripts', 'dmax7d.R'))
+source(here::here('updates_work_in_progress/trait_scripts', 'dmax1m.R'))
 source(here::here('updates_work_in_progress/trait_scripts', 'dmax12m.R'))
 source(here::here('updates_work_in_progress/trait_scripts', 'mcp24h.R'))
-source(here::here('updates_work_in_progress/trait_scripts', 'mcp7d.R'))
 source(here::here('updates_work_in_progress/trait_scripts', 'mcp1m.R'))
 source(here::here('updates_work_in_progress/trait_scripts', 'mcp12m.R'))
 source(here::here('updates_work_in_progress/trait_scripts', 'iou24h.R'))
@@ -57,13 +56,12 @@ referenceTableStudies <- readRDS(paste0(pathTOfolder,"referenceTableStudies_ALL_
 referenceTableStudiesUsed <- referenceTableStudies[referenceTableStudies$excluded=="no",]
 
 flsMV <- flsMV[flsMV %in% referenceTableStudiesUsed$fileName]
-
 # load data of one individual and apply all trait extraction functions its tracking data 
-flsMV
+
 lapply(flsMV, function(indPth)
   {
-  #indPth<-flsMV[4500]
   animlocs.1hourly <- readRDS(file.path(pthamt1h, indPth))
+  print(indPth)
   
 ## ----Resample data-------------------------------------------------------------
 #Resample data to 24h, 7 week time scales using amt
@@ -71,10 +69,6 @@ lapply(flsMV, function(indPth)
 animlocs.daily <- animlocs.1hourly |>
   track_resample(rate = hours(24),
                tolerance = minutes(60))
-
-animlocs.weekly <- animlocs.1hourly |>
-  track_resample(rate = hours(24*7),
-                 tolerance = minutes(60*24))
 
 ## ----Trait extraction-------------------------------------------------------------
 
@@ -93,13 +87,13 @@ dmax24h <- calc_dmax24h(animlocs.1hourly, dggs.10, dggs.1)
 sum.ind.dmax24h <- f_sum.ind.dmax24h(dmax24h)
 sum.monthly.ind.dmax24h <- f_sum.monthly.ind.dmax24h(dmax24h)
 
-#Maximum 7day displacement distance----
-dmax7d <- calc_dmax7d(animlocs.daily, dggs.10, dggs.1)
-sum.ind.dmax7d <- f_sum.ind.dmax7d(dmax7d)
-sum.monthly.ind.dmax7d <- f_sum.monthly.ind.dmax7d(dmax7d)
+#Maximum 1month displacement distance----
+dmax1m <- calc_dmax1m(animlocs.daily, dggs.10, dggs.1)
+sum.ind.dmax1m <- f_sum.ind.dmax1m(dmax1m)
+sum.monthly.ind.dmax1m <- f_sum.monthly.ind.dmax1m(dmax1m)
 
 #Maximum annual displacement distance----
-dmax12m <- calc_dmax12m(animlocs.weekly, dggs.10, dggs.1)
+dmax12m <- calc_dmax12m(animlocs.daily, dggs.10, dggs.1)
 sum.ind.dmax12m <- f_sum.ind.dmax12m(dmax12m)
 
 #Daily MCP----
@@ -107,18 +101,13 @@ mcp24h <- calc_mcp24h(animlocs.1hourly, dggs.10, dggs.1)
 sum.ind.mcp24h <- f_sum.ind.mcp24h(mcp24h)
 sum.monthly.ind.mcp24h <- f_sum.monthly.ind.mcp24h(mcp24h)
 
-#Weekly MCP----
-mcp7d <- calc_mcp7d(animlocs.1hourly, dggs.10, dggs.1)
-sum.ind.mcp7d <- f_sum.ind.mcp7d(mcp7d)
-sum.monthly.ind.mcp7d <- f_sum.monthly.ind.mcp7d(mcp7d)
-
 #Monthly MCP----
 mcp1m <- calc_mcp1m(animlocs.daily, dggs.10, dggs.1)
 sum.ind.mcp1m <- f_sum.ind.mcp1m(mcp1m)
 sum.monthly.ind.mcp1m <- f_sum.monthly.ind.mcp1m(mcp1m)
 
 #Annual MCP----
-mcp12m <- calc_mcp12m(animlocs.weekly, dggs.10, dggs.1)
+mcp12m <- calc_mcp12m(animlocs.daily, dggs.10, dggs.1)
 sum.ind.mcp12m <- f_sum.ind.mcp12m(mcp12m)
 
 #Daily IOU----
@@ -145,16 +134,15 @@ sum.monthly.ind.di <- f_sum.monthly.ind.di(di)
 MoveTrait.ind.sum <- bind_cols(sum.ind.d1h, 
                           bind_cols(sum.ind.d24h[,2:length(sum.ind.d24h)], 
                           bind_cols(sum.ind.dmax24h[,2:length(sum.ind.dmax24h)], 
-                          bind_cols(sum.ind.dmax7d[,2:length(sum.ind.dmax7d)], 
+                          bind_cols(sum.ind.dmax1m[,2:length(sum.ind.dmax1m)], 
                           bind_cols(sum.ind.dmax12m[,2:length(sum.ind.dmax12m)], 
                           bind_cols(sum.ind.mcp24h[,2:length(sum.ind.mcp24h)], 
-                          bind_cols(sum.ind.mcp7d[,2:length(sum.ind.mcp7d)], 
                           bind_cols(sum.ind.mcp1m[,2:length(sum.ind.mcp1m)], 
                           bind_cols(sum.ind.mcp12m[,2:length(sum.ind.mcp12m)], 
                           bind_cols(sum.ind.iou24h[,2:length(sum.ind.iou24h)],
                           bind_cols(sum.ind.iou1m[,2:length(sum.ind.iou1m)],
                           bind_cols(sum.ind.iou12m[,2:length(sum.ind.iou12m)], 
-                                    sum.ind.di[,2:length(sum.ind.di)])))))))))))) %>% 
+                                    sum.ind.di[,2:length(sum.ind.di)]))))))))))) %>% 
   filter(if_any(everything(), ~ !is.na(.)))
 
 library(bit64)
@@ -195,11 +183,9 @@ sum.monthly.ind.d1h |>
             by = join_by(individual_id, month, year)) |> 
   full_join(sum.monthly.ind.dmax24h, 
             by = join_by(individual_id, month, year)) |> 
-  full_join(sum.monthly.ind.dmax7d, 
+  full_join(sum.monthly.ind.dmax1m, 
             by = join_by(individual_id, month, year)) |> 
   full_join(sum.monthly.ind.mcp24h, 
-            by = join_by(individual_id, month, year)) |> 
-  full_join(sum.monthly.ind.mcp7d, 
             by = join_by(individual_id, month, year)) |> 
   full_join(sum.monthly.ind.mcp1m, 
             by = join_by(individual_id, month, year)) |> 
@@ -275,10 +261,10 @@ MoveTrait.repeats <-
             tidyr::nest(dmax24h = -individual_id), 
             by = c("individual_id" = "individual_id"))  else .} %>% 
   
-  # Dmax7d
-  {if (!is.null(dmax7d)) left_join(.,  dmax7d %>%
+  # Dmax1m
+  {if (!is.null(dmax1m)) left_join(.,  dmax1m %>%
                                      mutate(individual_id = as.character(individual_id)) %>%
-                tidyr::nest(dmax7d = -individual_id), 
+                tidyr::nest(dmax1m = -individual_id), 
             by = c("individual_id" = "individual_id"))  else .} %>% 
 
   # Dmax12m
@@ -292,12 +278,6 @@ MoveTrait.repeats <-
                                         mutate(individual_id = as.character(individual_id)) %>%
                 tidyr::nest(mcp24h = -individual_id), 
             by = c("individual_id" = "individual_id"))  else .} %>% 
-  
-  # mcp.weekly
-  {if (!is.null(mcp7d)) left_join(.,  mcp7d %>%
-                                         mutate(individual_id = as.character(individual_id)) %>%
-                tidyr::nest(mcp7d = -individual_id), 
-            by = c("individual_id" = "individual_id"))  else .} %>%
   
   # mcp.monthly
   {if (!is.null(mcp1m)) left_join(.,  mcp1m %>%
@@ -341,10 +321,6 @@ MoveTrait.repeats <-
     
 ## ----Save full database including raw metrics data--------------------
 saveRDS(MoveTrait.repeats, file=paste0(pthtrait,indPth))
-
-# rm(d1h);rm(d24h);rm(dmax7d);rm(dmax12m);rm(mcp24h);
-# rm(mcp7d);rm(mcp1m);rm(mcp12m);rm(iou24h);rm(iou1m);
-# rm(iou12m);rm(di);rm(animlocs.1hourly);rm(animlocs.daily);rm(animlocs.weekly)
 
 })
 
