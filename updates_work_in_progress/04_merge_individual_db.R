@@ -22,7 +22,7 @@ library(adehabitatHR); library(move2); library(epitools); library(suncalc); libr
 #-------------------------------------------------------------------------------------------
 
 ## ----Import movement data per individual-------------------------------------------------------------
-pathTOfolder <- "./updates_work_in_progress/DATA/"
+pathTOfolder <- "./updates_work_in_progress/DATA/Movebank/"
 
 #dir for individual summaries
 pthtraitsum <- paste0(pathTOfolder,"5.MB_indv_traitsum/")
@@ -115,7 +115,7 @@ length(unique(db.movebank.4$study_id))
 
 ## ----Merge Tucker data-------------------------------------------------------------
 
-db.tucker <- readRDS("./DATA/Tucker/MoveTraitsDB.v0.1_Tucker.rds")
+db.tucker <- readRDS("updates_work_in_progress/DATA/Tucker/tucker_individual.sum_20260521.rds")
 
 db.tucker <-
   db.tucker |> 

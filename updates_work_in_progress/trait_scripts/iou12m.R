@@ -30,17 +30,11 @@ if(is.null(iou12m)) NULL else {
   # Spatial annotation 10km
   cell_info_10 <- dgGEO_to_SEQNUM(dggs.10, iou12m$mean.x, iou12m$mean.y)
   iou12m$grid.id.10km <- cell_info_10$seqnum
-  centers_10 <- dgSEQNUM_to_GEO(dggs.10, iou12m$grid.id.10km)
-  iou12m$lon.10km <- centers_10$lon_deg
-  iou12m$lat.10km <- centers_10$lat_deg
 
   # Spatial annotation 1km
   cell_info_1 <- dgGEO_to_SEQNUM(dggs.1, iou12m$mean.x, iou12m$mean.y)
   iou12m$grid.id.1km <- cell_info_1$seqnum
-  centers_1 <- dgSEQNUM_to_GEO(dggs.1, iou12m$grid.id.1km)
-  iou12m$lon.1km <- centers_1$lon_deg
-  iou12m$lat.1km <- centers_1$lat_deg
-  
+
 }
 return(iou12m)
 }

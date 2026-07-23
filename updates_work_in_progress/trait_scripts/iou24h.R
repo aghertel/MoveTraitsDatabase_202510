@@ -18,7 +18,7 @@ iou24h <-
              mean.x = mean(lon),
              mean.y = mean(lat)) %>% 
       dplyr::select(individual_id,ymd,cumsumD1h,mean.x,mean.y) %>% distinct() %>%
-      left_join(tmp.mcp24h[,c("ymd","area")],by = "ymd") %>% 
+      left_join(tmp.mcp24h[,c("individual_id","ymd","area")],by = c("individual_id","ymd")) %>% 
       mutate(iou24h = cumsumD1h/sqrt(area)) %>% 
       filter(!is.na(iou24h)) |> 
       dplyr::select(individual_id,ymd,iou24h,mean.x, mean.y)
@@ -28,18 +28,10 @@ if(is.null(iou24h)) NULL else {
   # Spatial annotation 10km
   cell_info_10 <- dgGEO_to_SEQNUM(dggs.10, iou24h$mean.x, iou24h$mean.y)
   iou24h$grid.id.10km <- cell_info_10$seqnum
-  centers_10 <- dgSEQNUM_to_GEO(dggs.10, iou24h$grid.id.10km)
-  iou24h$lon.10km <- centers_10$lon_deg
-  iou24h$lat.10km <- centers_10$lat_deg
-
   
   # Spatial annotation 1km
   cell_info_1 <- dgGEO_to_SEQNUM(dggs.1, iou24h$mean.x, iou24h$mean.y)
   iou24h$grid.id.1km <- cell_info_1$seqnum
-  centers_1 <- dgSEQNUM_to_GEO(dggs.1, iou24h$grid.id.1km)
-  iou24h$lon.1km <- centers_1$lon_deg
-  iou24h$lat.1km <- centers_1$lat_deg
-
 }
 return(iou24h)
 }

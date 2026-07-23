@@ -39,9 +39,9 @@ dmax1m <- split(locs24h.sf, locs24h.sf$id.month) |>
 
 dmax1m <- 
   dmax1m |> 
-  mutate(month = as.numeric(str_split(id.month, "_", simplify = TRUE)[,3]),
-         year = as.numeric(str_split(id.month, "_", simplify = TRUE)[,2]),
-         individual_id = str_split(id.month, "_", simplify = TRUE)[,1]) |> 
+  mutate(month = as.numeric(stringr::str_extract(id.month, "\\d{1,2}$")),
+         year = as.numeric(stringr::str_extract(id.month, "\\d{4}(?=_[0-9]{1,2}$)")),
+         individual_id = stringr::str_remove(id.month, "_\\d{4}_\\d{1,2}$")) |> 
       filter(!is.na(dmax1m)) |> 
   dplyr::select(individual_id,month, year,dmax1m, lon_start, lat_start, lon_end, lat_end)
 
@@ -103,7 +103,7 @@ f_sum.monthly.ind.dmax1m<-function(x)
   # Check if the input is NULL
   if (is.null(x)) {
     return(data.frame(individual_id = NA,month= NA,
-                      year= NA, iou1m = NA ))
+                      year= NA, dmax1m = NA ))
   } 
   
   individual_id <- x$individual_id

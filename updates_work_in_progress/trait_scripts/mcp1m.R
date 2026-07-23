@@ -3,26 +3,6 @@ crs_4326  <- sp::CRS("EPSG:4326")
 crs_moll <- sp::CRS("+proj=moll +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs +type=crs")
 
 ## ----Function to get corner coordinates (vertices)-------------------------------------------------------------
-# get_polygon_vertices <- function(mcp_spdf) {
-#   out <- lapply(seq_along(mcp_spdf@polygons), function(i) {
-#     coords <- mcp_spdf@polygons[[i]]@Polygons[[1]]@coords
-#     if (all(coords[1, ] == coords[nrow(coords), ])) {
-#       coords <- coords[-nrow(coords), , drop = FALSE]
-#     }
-#     
-#     tmp <- SpatialPoints(coords, proj4string = crs_moll)
-#     tmp_ll <- spTransform(tmp, crs_4326)
-#     coords_ll <- coordinates(tmp_ll)
-#     
-#     data.frame(
-#       id = mcp_spdf@data$id[i],
-#       x_vertices = paste(coords_ll[, 1], collapse = ";"),
-#       y_vertices = paste(coords_ll[, 2], collapse = ";"),
-#       stringsAsFactors = FALSE
-#     )
-#   })
-#   do.call(rbind, out)
-# }
 
 get_polygon_vertices <- function(mcp_spdf) {
   if (is.null(mcp_spdf) || length(mcp_spdf@polygons) == 0) return(NULL)
@@ -76,7 +56,7 @@ calc_mcp1m <- function(trk,
   mutate(month = as.numeric(strftime(t_,format="%m")), 
          year = as.numeric(strftime(t_,format="%Y"))) %>% 
   mutate(year_month = paste(year,month,sep="_")) |> 
-  mutate(id.month = paste(individual_id,year_month,sep=".")) %>% 
+  mutate(id.month = paste(individual_id,year_month,sep="_")) %>% 
   filter(!is.na(x_)) %>% filter(!is.na(y_)) %>% group_by(id.month) %>% 
   filter(n() > min_days_n) %>% ungroup() %>% dplyr::select(x_,y_,id.month) 
   
@@ -93,10 +73,9 @@ mcp.monthly <- if (nrow(dat.mcp.monthly) == 0) {
     
     mcp_df <- data.frame(mcp_spdf) |>
       mutate(
-        month = as.numeric(str_extract(id, "(\\d+$)")),
-        year_month = str_extract(id, "[^.]*$"),
-        individual_id = str_extract(id, "[^.]+")
-      ) |>
+        month = as.numeric(stringr::str_extract(id, "\\d{1,2}$")),
+        year_month = stringr::str_extract(id, "\\d{4}_\\d{1,2}$"),
+        individual_id = stringr::str_remove(id, "_\\d{4}_\\d{1,2}$")) |>
       filter(!is.na(area))
     
     verts_df <- get_polygon_vertices(mcp_spdf)

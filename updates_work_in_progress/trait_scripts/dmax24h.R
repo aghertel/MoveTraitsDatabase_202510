@@ -1,8 +1,8 @@
 ## ----Maximum 24hr displacement-------------------------------------------------------------
 
 calc_dmax24h <- function(trk, 
-                         dggs_10, 
-                         dggs_1, 
+                         dggs.10, 
+                         dggs.1, 
                          min_daily_n = 12, 
                          min_ymd_n = 7) 
   {
@@ -21,7 +21,7 @@ locs1h.sf <- sf::st_as_sf(locs1h,
                           crs = 4326)
 
 dmax24h <- split(locs1h.sf, locs1h.sf$id.ymd) |>
-  imap_dfr(function(x, nm) {
+  purrr::imap_dfr(function(x, nm) {
     d <- sf::st_distance(x)
     diag(d) <- NA
     idx <- which(d == max(d, na.rm = TRUE), arr.ind = TRUE)[1, ]
@@ -40,8 +40,8 @@ dmax24h <- split(locs1h.sf, locs1h.sf$id.ymd) |>
 
 dmax24h <- 
   dmax24h |> 
-  mutate(ymd = str_split(id.ymd, "_", simplify = TRUE)[,2],
-        individual_id = str_split(id.ymd, "_", simplify = TRUE)[,1])|> 
+  mutate(ymd = stringr::str_extract(id.ymd, "\\d{4}-\\d{2}-\\d{2}$"), #str_split(id.ymd, "_", simplify = TRUE)[,2],
+        individual_id = stringr::str_remove(id.ymd, "_\\d{4}-\\d{2}-\\d{2}$")) |> #str_split(id.ymd, "_", simplify = TRUE)[,1])|> 
   filter(!is.na(dmax24h)) |> 
   dplyr::select(individual_id,ymd,dmax24h,lon_start, lat_start, lon_end, lat_end)
 

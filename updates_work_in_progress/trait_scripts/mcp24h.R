@@ -29,12 +29,11 @@ calc_mcp24h <- function(trk,
                          dggs_1, 
                          min_hours_n = 12) 
 {
-  #trk <- animlocs.1hourly
   dat.mcp.daily <- trk %>% 
   tibble() %>% mutate(ymd = as.character(format(as.Date(t_), "%Y-%m-%d")))  %>%
   filter(!is.na(x_)) %>% 
   filter(!is.na(y_)) %>% 
-  mutate(id.day = paste(individual_id,ymd,sep=".")) %>% 
+  mutate(id.day = paste(individual_id,ymd,sep="_")) %>% 
   group_by(id.day) %>% 
   filter(n() > min_hours_n) %>% 
   ungroup() %>% 
@@ -53,8 +52,8 @@ mcp.daily <- if (nrow(dat.mcp.daily) == 0) {
   
   mcp_df <- data.frame(mcp_spdf) |>
     mutate(
-      ymd = str_split(id, '[.]', simplify = TRUE)[,2],
-      individual_id = str_split(id, '[.]', simplify = TRUE)[,1]) |>
+      ymd = str_extract(id, "\\d{4}-\\d{2}-\\d{2}$"),
+      individual_id = stringr::str_remove(id, "_\\d{4}-\\d{2}-\\d{2}$")) |>
     filter(!is.na(area))
   
   verts_df <- get_polygon_vertices(mcp_spdf)
