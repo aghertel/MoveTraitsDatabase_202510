@@ -36,9 +36,18 @@ library("data.table")
 
 # path_to_indv_move2 <- "./MoveTraitsData/2.MB_indv_mv2_clean//404939825_426527460.rds"
 referenceTableStudies <-  function(path_to_indv_move2){
+  
   print(path_to_indv_move2) # this makes it easy to find which one gave an error
   indiv_mv2 <- readRDS(path_to_indv_move2)
+  indiv_mv2 <- indiv_mv2[order(mt_track_id(indiv_mv2)),] # order track -  to fix error 
   indiv_mv2_td <- mt_track_data(indiv_mv2)
+
+  # Skip files with no track data or no locations (empty move2 objects)
+  if(nrow(indiv_mv2_td) == 0 || nrow(indiv_mv2) == 0){
+    warning(paste0("Skipping empty file: ", path_to_indv_move2))
+    return(NULL)
+  }
+  
   fileNameL <- strsplit(path_to_indv_move2,"/")
   fileName <- fileNameL[[1]][length(fileNameL[[1]])]
   
