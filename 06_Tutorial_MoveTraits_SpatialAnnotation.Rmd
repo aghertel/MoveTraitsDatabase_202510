@@ -1,0 +1,600 @@
+---
+title: "MoveTraits.V0.1 Spatial Annotation Tutorial"
+author: "Anne G. Hertel"
+date: "8/20/2026"
+output:
+  html_document:
+    theme: cosmo
+    toc: true
+    toc_float:
+      collapsed: true
+    code_folding: show
+  pdf_document:
+    toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "DATA/MoveTraitsData/8.MoveTraits_db/")
+```
+
+```{r packages, warning=FALSE,message=FALSE}
+library(tidyverse);library(bit64); library(geodata);library(dggridR);library(terra); library(sf); library(mapview);library(RColorBrewer);library(dplyr);library(stringr);library(purrr);library(ggspatial)
+```
+
+
+# **Download the database**
+
+Please download the three levels of the database from figshare and store in your local directory:
+
+https://doi.org/10.6084/m9.figshare.28611890.v2
+
+# **Load MoveTraits database**
+
+The MoveTraits database version 0.2 has been compiled from open access data from Tucker et al. 2023 "Behavioral responses of terrestrial mammals to COVID-19 lockdowns" (https://zenodo.org/records/7704108, file "Tucker_Road_Spatial.rds"; only data from 2019) and from all openly available GPS datasets in Movebank (effective 08.2026). 
+
+The database has four levels, stored in separate files: 
+  + species level trait summaries
+  + individual level traits summaries
+  + individual monthly trait summaries
+  + within individual repeated trait measures. 
+
+# **Defining the spatial grid**
+We have annotated traits with spatial grids to facilitate annotation with environmental layers while protecting the underlying gps coordinates. We are using hexagonal equal area grids from the the dggridR package at approximately 1 square kilometer (1km resolution), 100 square kilometer (10km resolution) and 10000 square kilometer (100km resolution). 
+
+In order to link the grid cell identities provided in the database back to a spatial representation we have to define the three spatial grids as follows:
+
+```{r}
+dggs.100    <- dgconstruct(projection = "ISEA", area = 10000, resround='nearest')
+dggs.10     <- dgconstruct(projection = "ISEA", area = 100, resround='nearest')
+dggs.1      <- dgconstruct(projection = "ISEA", area = 1, resround='nearest')
+```
+
+As an example for how the grid looks like - we are here showing exemplary the grid cells at 100km resolution (10000 square km) intersecting Germany. 
+
+```{r, warning=FALSE, echo = F}
+grid <- dgearthgrid(dggs.100, savegrid = NA, return_sf = TRUE) 
+
+ger_sf <- map_data("world") %>%
+  filter(region == "Germany") |> 
+  st_as_sf(coords = c("long", "lat"), crs = 4326, agr = "constant") %>%
+  group_by(group) %>%
+  summarise(geometry = st_combine(geometry)) %>%
+  st_cast("POLYGON") %>%
+  st_union() %>%
+  st_sf() 
+
+cropped_poly <- st_intersection(grid, ger_sf)
+
+ggplot() +
+  geom_sf     (data=ger_sf, color=alpha("black"), fill = NA) +
+  geom_sf     (data=cropped_poly, color=alpha("black"), fill = NA) +
+  theme_minimal() 
+```
+
+# **Species level**
+
+We load the species level database which contains one row per species with trait summaries and information of all occupied grid cells where the species was observed ad where the traits where measured. 
+
+```{r}
+mt_sp <- readRDS("MoveTrait.v0.1_species.sum_20260807.rds")
+```
+
+Spatial annotations are stored in the columns **grid.id.100km** and **grid.id.10km**.
+
+```{r}
+colnames(mt_sp)
+```
+
+For each species, all occupied cells are listed, separated by a semicolon.
+
+```{r}
+str(mt_sp$grid.id.100km)
+```
+
+We can select a species and visualize the occupied grid cells. For example the white stork "Ciconia ciconia"
+
+```{r}
+focal_species <- "Ciconia ciconia"
+
+grid.id.100km <- mt_sp |>
+  filter(species == focal_species) |>
+  pull(grid.id.100km) |>
+  strsplit(";") |>
+  unlist() |>
+  as.numeric()
+```
+
+Where did the species occur?
+Maps are dynamic and you can zoom in and explore. 
+
+```{r}
+intersect_cells_100 <- dgcellstogrid(dggs.100, grid.id.100km)
+mapview(intersect_cells_100, map.types = c("OpenStreetMap.DE"), col.regions = "#CC5500", legend = FALSE)
+```
+
+We can do the same for the finer 10 km grid cells. Here for example for Fishers.
+
+```{r}
+focal_species <- "Martes pennanti"
+
+grid.id.10km <- mt_sp |>
+  filter(species == focal_species) |>
+  pull(grid.id.10km) |>
+  strsplit(";") |>
+  unlist() |>
+  as.numeric()
+
+intersect_cells_10 <- dgcellstogrid(dggs.10, grid.id.10km)
+mapview(intersect_cells_10, map.types = c("OpenStreetMap.DE"), col.regions = "#CC5500", legend = FALSE)
+```
+
+In the remainder of the tutorial we will demonstrate grid cell annotation using three exemplary individuals, one stork, one fisher, and one lion. All functions work for every individual, provided the trait of interest could be calculated.
+
+Please proceed to find out how grid cells can be annotated with the environment. Since traits are summarized for the species level of the database, individual grid cells can not be associated with a value of the trait expression.
+
+# **Individual level**
+
+The individual level database contains one row per individual with trait summaries and information of all by the individual occupied grid cells. 
+
+```{r}
+mt_ind <- readRDS("MoveTrait.v0.1_individual.sum_20260807.rds")
+```
+
+The individual level database follows the same structure as the species level database. But contains more individual level information, such as the study and individual id:
+
+```{r, echo = F}
+column_info <- data.frame(
+  ColumnName = 
+    c(names(mt_ind)[c(1:13)]
+      ),
+  Explanation = c(
+    "Movebank study identifier",
+    "Movebank individual identifier",
+    "Individual identifier given by the data owner",
+    "Species latin name",
+    "Speceis common name",
+    "Taxonomic class (mammal/bird)",
+    "Primary movement mode (walk, fly, swim)",
+    "Female / male",
+    "Mass in gram",
+    "Life stage when tag was deployed",
+    "Movebank or Tucker et al.",
+    "Intersecting 100km grid cell identities",
+    "Intersecting 10km grid cell identities"
+  )
+)
+
+knitr::kable(column_info, caption = "Column descriptions")
+```
+
+## From cell identity to spatial annotation
+
+We select a focal individual and unpack it's gridded information
+
+```{r}
+focal_individual <- "10666985"
+
+grid.id.100km <- mt_ind |>
+  filter(individual_id == focal_individual) |>
+  pull(grid.id.100km) |>
+  strsplit(";") |>
+  unlist() |>
+  as.numeric()
+```
+
+```{r,echo=F}
+print(grid.id.100km)
+length(grid.id.100km)
+```
+
+The animal moved over 87 grid cells of 100km resolution (10000 square km). Therefore the trait summary is associated to that space. 
+
+Now we can use the *dgcellstogrid()* function to visualize where the individual occurred.
+
+```{r}
+intersect_cells_100 <- dgcellstogrid(dggs.100, grid.id.100km)
+mapview(intersect_cells_100, map.types = c("OpenStreetMap.DE"), col.regions = "#CC5500", legend = FALSE)
+```
+
+We can use the *dgSEQNUM_to_GEO()* function to get each grid cells centroid coordinates.
+
+```{r}
+lon <- dgSEQNUM_to_GEO(dggs.100, grid.id.100km)$lon_deg
+lat <- dgSEQNUM_to_GEO(dggs.100, grid.id.100km)$lat_deg
+centroids <- data.frame(grid.id.100km,lon,lat)
+```
+
+```{r,echo=FALSE}
+head(centroids)
+```
+
+## Load example environmental layer
+
+Example - load and extract HFI values associated with the animals occurrence.
+HFI is measured at a 1km resolution. 
+We use the geodata package to load the datalyer, in case the geodata server is down, the map can be downloaded manually from: https://wcshumanfootprint.org/v2/
+
+```{r,warning=FALSE}
+hfi <- tryCatch(
+  geodata::footprint(year = 2009, path = "."),
+  error = function(e) terra::rast("HFP2009/HFP2009.tif")
+)
+if (is.null(hfi) || !all(is.finite(as.vector(terra::ext(hfi))))) {
+  hfi <- terra::rast("HFP2009/HFP2009.tif")
+}
+```
+
+```{r, echo=FALSE}
+plot(hfi)
+```
+
+## Extract environmental information 
+
+We show two ways how we can use the spatial grids to annotate individual trait summaries with the environment. 
+
+### A: intersect the grid centroid coordinate with the spatial layer of interest. 
+Mind, when the spatial resolution of the spatial layer is much higher than the grid resolution (100km or 10km), using the centroid for annotation can be misleading. 
+(if the layer was downlaoded with the geodata package please replace zcol "HFP2009" with "wildareas.v3.2009.human.footprint")
+
+```{r,warning=FALSE}
+pts <- vect(centroids, crs = "EPSG:4326")
+values <- terra::extract(hfi, pts, ID = FALSE, bind = TRUE)
+values_sf <- sf::st_as_sf(values)
+
+intersect_cells_100_centroidHFI <- intersect_cells_100 |> 
+  left_join(st_drop_geometry(values_sf), by = c("seqnum" = "grid.id.100km")) 
+
+mapview(intersect_cells_100_centroidHFI, map.types = c("OpenStreetMap.DE"), 
+        zcol = "wildareas.v3.2009.human.footprint",
+        col.regions = colorRampPalette(rev(brewer.pal(11, "RdYlBu"))))
+```
+
+### B: calculating the mean HFI of all values intersecting with the spatial grid cell. 
+This way - uncertainty about where the animal was located within the diffused grid cell is accounted for
+
+```{r,warning=FALSE}
+hfi_mean <- terra::extract(hfi, terra::vect(intersect_cells_100), fun = mean, na.rm = TRUE)
+
+intersect_cells_100_meanHFI <- intersect_cells_100 |>
+  mutate(hfi_mean = hfi_mean[, 2])
+
+mapview(intersect_cells_100_meanHFI, zcol = "hfi_mean",
+        map.types = "OpenStreetMap.DE", col.regions = colorRampPalette(rev(brewer.pal(11, "RdYlBu"))))
+```
+
+We recommend calculating the mean value of the environmental layer within each grid cell instead of using the raw values at the centroid coordinate, whenever the spatial resolution of the environmental layer is finer than the grid cell size.
+
+```{r,echo=FALSE,warning=FALSE}
+hfi_table <- st_drop_geometry(intersect_cells_100_centroidHFI) |>
+  left_join(st_drop_geometry(intersect_cells_100_meanHFI), by = "seqnum") |>
+  select(
+    `grid.id.100km` = seqnum,
+    `HFI at centroid coordinate` = wildareas.v3.2009.human.footprint,
+    `mean HFI in grid cell` = hfi_mean
+  )
+
+ggplot(hfi_table)+
+  geom_point(aes(x = `mean HFI in grid cell`, y = `HFI at centroid coordinate`))+
+  theme_classic()
+```
+
+
+# **Monthly summary**
+
+The monthly summary table contains one row per individual and month. Finer temporal traits (1h & 24h displacement, max24h displacement, 24h range size, 24h intensity of use and diurnality index) are summarised for each month. Monthly traits (monthly maximum displacement, range size and intensity of use) appear as repeated trait measures. Annual traits are not listed - please refer to the individual summary or the repeated within individual trait measures.
+
+```{r}
+mt_month <- readRDS("MoveTrait.v0.1_monthly.sum_20260807.rds")
+```
+
+The monthly summaries of traits are spatially referenced with all grid cells (grid.id.100km and grid.id.10km columns) that were occupied during the given month by the individual.
+
+For this section we will use a range resident fisher as an example. 
+
+The data are from 
+"LaPoint S. 2026. Data from: Study \"Carnivore movements near Black Rock Forest New York\". Movebank Data Repository. <a href=\"https://doi.org/10.5441/001/1.652\" target=\"_blank\">https://doi.org/10.5441/001/1.652</a>  <br><br>  These data are described in <br>  Oliver RY, Yanco SW, Ellis-Soto D, Jesmer BR, Cohen J, Gao S, Patchett R, Avgar T, Bildstein K, Bakner NW, et al. 2026. Interacting effects of human presence and landscape modification on birds and mammals. Science. https://doi.org/10.1126/science.adq3396<br><br>LaPoint et al. in progress"
+
+```{r}
+focal_individual <- "2705708446"
+```
+
+```{r, echo = F}
+knitr::kable(head(mt_month[mt_month$individual_id == focal_individual, c(1,2,4,5,12,13,14,15,17,23,29,35,52:54)], 3))
+```
+
+The information, which cells were occupied in which months need to be unpacked from wide to long format, here exemplary done for grid.id.10km. The same procedure applies to the 100km grid.
+
+```{r}
+monthly_cells_10 <- mt_month |>
+  filter(individual_id == focal_individual) |> 
+  separate_rows(grid.id.10km, sep = ";") %>%   
+  mutate(grid.id.10km = as.numeric(grid.id.10km),
+         month = str_pad(month, width = 2, pad = "0"),
+         year_month = as.factor(paste(year,month,sep="_")))
+```
+
+The long format data column can then be used to identify which cells were occupied. 
+```{r}
+intersect_cells_10 <- dgcellstogrid(dggs.10, monthly_cells_10$grid.id.10km)
+intersect_cells_10 <- 
+  merge(intersect_cells_10,
+        monthly_cells_10[,c("grid.id.10km","year_month")],
+        by.x="seqnum",by.y="grid.id.10km")
+```
+
+We can now visualize where the individual had been in specific months.
+```{r}
+mapview(intersect_cells_10, map.types = c("OpenStreetMap.DE"), zcol = "year_month")
+```
+
+For range resident species, or species where monthly ranges overlap,a gridded representation is more useful.
+
+```{r,message=FALSE}
+ggplot() +
+    annotation_map_tile(type = "osm", zoom = 5, quiet = TRUE) +
+    geom_sf(data = intersect_cells_10, aes(fill = year_month), colour = NA) +
+    scale_fill_viridis_d() +
+    theme_classic() +
+    facet_wrap(~year_month) +
+    theme(axis.text = element_blank())+
+    theme(legend.position = "none")
+```
+
+## Extract environmental information
+
+Trait summaries can be annotated with environmental conditions using time information (i.e. month and year) and monthly specific spatial grid cells. 
+
+```{r}
+hfi_mean <- terra::extract(hfi, terra::vect(intersect_cells_10), fun = mean, na.rm = TRUE)
+
+intersect_cells_10_meanHFI <- intersect_cells_10 |>
+  mutate(hfi_mean_cell = hfi_mean[, 2]) |> 
+  group_by(year_month) |> 
+  mutate(mean_hfi_month = mean(hfi_mean_cell))
+
+mapview(intersect_cells_10_meanHFI[intersect_cells_10_meanHFI$year_month %in% "2023_03",], 
+        zcol = "hfi_mean_cell",
+        map.types = "OpenStreetMap.DE", 
+        col.regions = colorRampPalette(rev(brewer.pal(11, "RdYlBu"))),
+        layer.name = "Mean HFI")
+
+```
+
+# **Within Individual repeated trait measures**
+
+```{r}
+mt_wind <- readRDS("MoveTrait.v0.1_withinindividual_20260807.rds")
+```
+
+The third level of the database provides repeated individual trait measures. For each individual and every trait we provide the underlying repeated trait measures as a list of nested dataframes in columns 12 - 23
+
+```{r}
+names(mt_wind)
+class(mt_wind[,12])
+```
+
+For this section we will use a range resident lion as an example. 
+
+## Maximum displacement - grid cells to end points
+
+The underlying distribution for the trait "dmax1m" (maximum monthly displacement), for the focal individual in the database can be accessed in the following way. 
+
+```{r}
+focal_individual <- "3791479362"
+example.dmax24h <- mt_wind[mt_wind$individual_id == focal_individual, "dmax24h"][[1]]
+```
+
+For this individual we have 487 maximum daily displacement records, we select one for demonstrative purposed
+
+```{r}
+nrow(example.dmax24h)
+example.dmax24h <- example.dmax24h[380,]
+head(example.dmax24h)
+```
+
+For open access data, individual trait measures contains the latitude and longitude of the start and end points of the longest displacement segment. For closed access data it contains the identity of the two grid cell that contain the start and endpoints coordinate of the segment, at either 10km, or 10km and 1km resolution, depending on the data owner's sharing selection.
+
+We here visualize the true endpoints and the associated grid cells at 10km and 1km for one segment of maximum daily displacement. 
+
+```{r}
+# start and endpoint grid cells at 1km
+cells_1 <- example.dmax24h |>
+  dplyr::select(grid.id.1km) |>
+  tidyr::separate_longer_delim(grid.id.1km, delim = ";") |>
+  mutate(grid.id.1km = as.integer(grid.id.1km))
+intersect_cells_1 <- dgcellstogrid(dggs.1, unique(cells_1$grid.id.1km))
+
+# start and endpoint grid cells at 10km
+cells_10 <- example.dmax24h |>
+  dplyr::select(grid.id.10km) |>
+  tidyr::separate_longer_delim(grid.id.10km, delim = ";") |>
+  mutate(grid.id.10km = as.integer(grid.id.10km))
+intersect_cells_10 <- dgcellstogrid(dggs.10, unique(cells_10$grid.id.10km))
+
+# start and end coordinates as sf object
+start_pt <- example.dmax24h |>
+  st_as_sf(coords = c("lon_start", "lat_start"), crs = 4326)
+end_pt <- example.dmax24h |>
+  st_as_sf(coords = c("lon_end", "lat_end"), crs = 4326)
+
+# daily maximum displacement as segment 
+segment <- c(st_geometry(start_pt), st_geometry(end_pt)) |>
+  st_combine() |>
+  st_cast("LINESTRING") |>
+  st_as_sf()
+
+# visualize
+mapview(intersect_cells_10, map.types = c("OpenStreetMap.DE"), legend = FALSE,
+        col.regions = "transparent", alpha.regions = 0, color = "steelblue", lwd = 2,
+        layer.name = "10 km grid size") +
+mapview(intersect_cells_1, map.types = c("OpenStreetMap.DE"), legend = FALSE,
+        col.regions = "transparent", alpha.regions = 0, color = "darkorange", lwd = 1,
+        layer.name = "1 km grid size") +
+  mapview(start_pt, col.regions = "green",     cex = 8, layer.name = "Start") +
+  mapview(end_pt,   col.regions = "red",       cex = 8, layer.name = "End") +
+  mapview(segment,      color = "black",  lwd = 3, layer.name = "Dmax24h")
+```
+
+Environmental context (e.g., HFI) can be extracted and averaged within the grid cells intersecting the endpoints.
+
+```{r}
+meanHFI <- terra::extract(hfi,
+  terra::vect(sf::st_transform(intersect_cells_10, terra::crs(hfi))),
+  fun = mean, na.rm = TRUE, ID = FALSE)
+intersect_cells_10$wildareas.v3.2009.human.footprint <- meanHFI[, 1]
+head(intersect_cells_10)
+```
+
+## Home range - from vertices to home range polygons
+
+Next we demonstrate how home ranges are annotated and how grid cells can be used to reverse engineer the are where the home range was roughly placed.
+
+Range sizes are calculated as 95% Minimum Convex Polygon of all GPS locations in a given time frame (e.g., within one day, month, or year). 
+
+For open access data, range sizes are annotated with vertex coordinates which can be directly transformed back into the MCP polygon. 
+Alternatively, these vertex coordinates are diffused at 1 or 10 km allowing to reproduce the home range at a courser scale. 
+
+```{r}
+all_mcp1m <- mt_wind[mt_wind$individual_id == focal_individual, "mcp1m"][[1]]
+head(all_mcp1m)
+example.mcp1m <- all_mcp1m[1,]
+```
+
+We select a single monthly home range for demonstration purposes.
+
+### Observation level data
+Function to reproduce home ranges for individuals with observation level data.
+
+```{r}
+vertices_to_polygon <- function(x_vertices, y_vertices) {
+  x <- as.numeric(str_split(x_vertices, ";", simplify = TRUE))
+  y <- as.numeric(str_split(y_vertices, ";", simplify = TRUE))
+  
+  coords <- cbind(x, y)
+  coords <- coords[complete.cases(coords), , drop = FALSE]
+  
+  if (!all(coords[1, ] == coords[nrow(coords), ])) {
+    coords <- rbind(coords, coords[1, , drop = FALSE])
+  }
+  
+  st_polygon(list(coords))
+}
+```
+
+```{r}
+mcp_observation <- example.mcp1m %>%
+  mutate(
+    geometry = map2(x_vertices, y_vertices, vertices_to_polygon),
+    month = as.factor(month)) %>%
+  st_as_sf(sf_column_name = "geometry", crs = 4326)
+```
+
+```{r}
+mapview(mcp_observation,
+        col.regions = colorRampPalette(rev(brewer.pal(11, "RdYlBu"))))
+```
+
+
+### 1. unpack the grid cell vertices of the range. Vertices are stored in column "grid.id.10km" or "grid.id.1km" into long format.
+
+```{r}
+cells_long <- example.mcp1m %>%
+  dplyr::select(id, month, year_month, area, grid.id.1km)  |> 
+  separate_rows(grid.id.1km, sep = ";") |> 
+  filter(!is.na(grid.id.1km), grid.id.1km != "") |> 
+  mutate(grid.id.1km = as.integer(grid.id.1km),
+         year_month = as.factor(year_month))
+```
+
+```{r,echo=FALSE}
+head(cells_long)
+```
+
+### 2. extract the grid cell boundaries of the vertices for one month - here March
+
+```{r}
+grid_sf <- dgcellstogrid(dggs.1, cells_long$grid.id.1km) |> 
+  left_join(cells_long,year_month, by = c("seqnum" = "grid.id.1km")) 
+
+mapview(grid_sf,
+        col.regions = colorRampPalette(rev(brewer.pal(11, "RdYlBu"))),
+        layer.name = "Home range vertices") 
+```
+
+### 3. recreate the MCP based on the grid cells
+
+```{r}
+mcp_1km <- grid_sf %>%
+  group_by(year_month) %>%
+  summarise(geometry = st_union(geometry), .groups = "drop") |> 
+  mutate(geometry = st_convex_hull(geometry))
+```
+
+This individual's data were open access and we hence can show the vertices of the calcualted MCP - here in orange. The vertices fall into three adjacent 10km grid cells. For closed access data, we do not know where the observed vertices were placed but we can reconstruct an area within which the home range falls by drawing a polygon around the annotated grid cells. 
+
+```{r,echo=FALSE}
+mapview(grid_sf,
+        alpha.regions = 0, color = "red", col.regions = "red", lwd = 2,
+        layer.name = "Annotation grid cells") +
+  mapview(mcp_1km,
+          alpha.regions = 0, color = "blue", col.regions = "blue", lwd = 2,
+          layer.name = "Derived MCP") +
+  mapview(mcp_observation,
+          alpha.regions = 0, color = "orange", col.regions = "orange", lwd = 2,
+          layer.name = "Observed MCP")
+```
+
+For 10 km grid cells this recreated home range is obviously much less precise.
+
+```{r,echo=FALSE}
+cells_long <- example.mcp1m %>%
+  dplyr::select(id, month, year_month, area, grid.id.10km)  |> 
+  separate_rows(grid.id.10km, sep = ";") |> 
+  filter(!is.na(grid.id.10km), grid.id.10km != "") |> 
+  mutate(grid.id.10km = as.integer(grid.id.10km))
+grid_sf <- dgcellstogrid(dggs.10, cells_long$grid.id.10km) |> 
+  left_join(cells_long,year_month, by = c("seqnum" = "grid.id.10km")) 
+mcp_10km <- grid_sf %>%
+  group_by(year_month) %>%
+  summarise(geometry = st_union(geometry), .groups = "drop") |> 
+  mutate(geometry = st_convex_hull(geometry))
+
+mapview(grid_sf,
+        alpha.regions = 0, color = "red", col.regions = "red", lwd = 2,
+        layer.name = "Annotation grid cells") +
+  mapview(mcp_10km,
+          alpha.regions = 0, color = "blue", col.regions = "blue", lwd = 2,
+          layer.name = "Derived MCP") +
+  mapview(mcp_observation,
+          alpha.regions = 0, color = "orange", col.regions = "orange", lwd = 2,
+          layer.name = "Observed MCP")
+```
+
+### 4. Annotate ranges with environmental covariates
+
+The polygons created either from observation level coordinates or from grid cells can then be used to annotate traits with environmental layers.
+
+Here, for example in bulk for all monthly home ranges observed for this lion. 
+
+```{r}
+head(all_mcp1m)
+
+# Reconstruct monthly home range polygons for all rows
+all_mcp1m_sf <- all_mcp1m |>
+  mutate(
+    geometry = map2(x_vertices, y_vertices, vertices_to_polygon),
+    month    = as.factor(month)
+  ) |>
+  st_as_sf(sf_column_name = "geometry", crs = 4326)
+
+# Extract mean HFI within each monthly polygon
+hfi_extracted <- terra::extract(hfi, terra::vect(all_mcp1m_sf), fun = mean, na.rm = TRUE)
+
+# Join mean HFI back to all_mcp1m
+all_mcp1m <- all_mcp1m |>
+  mutate(hfi.mean = hfi_extracted[, 2])
+
+head(all_mcp1m)
+```
+
