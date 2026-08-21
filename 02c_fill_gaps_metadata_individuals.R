@@ -12,7 +12,7 @@
 ## for the future if common name and locomotion mode need to be added, this might be a good place to do so.
 #######
 
-pathTOfolder <- "./MoveTraitsData/"
+pathTOfolder <- "./DATA/MoveTraitsData/"
 referenceTableStudies_ALL <- readRDS(file=paste0(pathTOfolder,"/referenceTableStudies_ALL_excludedColumn.rds"))
 
 table(is.na(referenceTableStudies_ALL$animal_life_stage))
