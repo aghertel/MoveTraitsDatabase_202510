@@ -1,6 +1,5 @@
 library(mapview)
 
-
 MoveTrait.v0.1 <- readRDS(file=paste0(pthdb,"MoveTrait.v0.1_individual.sum_20250304.rds"))
 
 ## ----Hebblewhite cervus elaphus/canadensis-------------------------------------------------------------
