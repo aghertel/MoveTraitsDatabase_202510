@@ -35,11 +35,11 @@ library(ggplot2)
 library(scales)
 
 pathTOfolder <- "./DATA/MoveTraitsData/"
-referenceTableStudies <- readRDS(paste0(pathTOfolder,"/referenceTableStudies_ALL_original.rds"))
+referenceTableStudies <- readRDS(paste0(pathTOfolder,"referenceTableStudies_ALL_original.rds"))
 
 pthamt1h <- paste0(pathTOfolder,"4.MB_indv_amt_1h/")
-dir.create(paste0(pathTOfolder,"5.speed_per_species"))
-pthspsSpeed <- paste0(pathTOfolder,"5.speed_per_species/")
+# dir.create(paste0(pathTOfolder,"5.speed_per_species"))
+# pthspsSpeed <- paste0(pathTOfolder,"5.speed_per_species/")
 #dir.create(paste0(pathTOfolder,"6.steplenght_per_species"))
 #pthspsStplngh <- paste0(pathTOfolder,"6.steplenght_per_species/")
 
@@ -50,37 +50,38 @@ pthamt1hOutl <- paste0(pathTOfolder,"5.MB_indv_amt_1h_outlspeed/")
 #pthamt1hOutlDist <- paste0(pathTOfolder,"6.MB_indv_amt_1h_outlspeed_dist/")
 
 ### create table with speeds quantiles, nb of indiv, date when created. Use this table to filter out speeds
-tb_per_sps_L <- split(referenceTableStudiesUsed, referenceTableStudiesUsed$species)
+#tb_per_sps_L <- split(referenceTableStudiesUsed, referenceTableStudiesUsed$species)
 
 #sps_tb <- tb_per_sps_L[[267]]
 
 ### annotate species with class
-#library(taxize)
-#out <- classification(as.character(unique(referenceTableStudies$species)), db = 'itis')
-# 
+library(taxize)
+out <- classification(as.character(unique(referenceTableStudies$species)), db = 'itis')
+ 
 # # Extract the 'class' rank for each species
-# class_vec <- sapply(out, function(x) {
-#   if (is.null(x) || !is.data.frame(x) || !"class" %in% x$rank) return(NA)
-#   x$name[x$rank == "class"]
-# })
-# 
-# class_df <- tibble::enframe(class_vec)
-# 
-# class_df[is.na(class_df$value),2] <- "Aves"
-# class_df[class_df$name %in% c("Sapajus macrocephalus","Tapirus bairdii","Bison bison",
-#                               "Martes pennanti","Myotis daubentoni","Capra hircus,Ovis aries"),2] <- "Mammalia"
-# class_df[class_df$name %in% c("Chelonoidis donfaustoi","Chelonoidis hoodensis",
-#                               "Chelonoidis porteri","Chelonoidis ,Chelonoidis hoodensis,Chelonoidis porteri,Chelonoidis donfaustoi"),2] <- "Reptilia"
-# class_df$cutoff <- ifelse(class_df$value %in% "Aves", 180,
-#                           ifelse(class_df$value %in% "Mammalia", 25, 180))
-# 
-# class_df <- merge(referenceTableStudies[,c("fileName","species")],
-#                    class_df,
-#                    by.x = "species",by.y="name")
-# 
-# 
-# saveRDS(class_df,"referenceTableStudies_taxonomy.rds")
-class_df <- readRDS("referenceTableStudies_taxonomy.rds")
+class_vec <- sapply(out, function(x) {
+  if (is.null(x) || !is.data.frame(x) || !"class" %in% x$rank) return(NA)
+  x$name[x$rank == "class"]
+})
+
+class_df <- tibble::enframe(class_vec)
+
+View(class_df[is.na(class_df$value),])
+
+class_df[c(1:13,17,20,22,23,28:30,32:35,37,40),2] <- "Aves"
+class_df[c(14,24:27),2] <- "Reptilia" 
+class_df[c(16,19,21,31,36,38:39),2] <- "Mammalia" 
+
+class_df$cutoff <- ifelse(class_df$value %in% "Aves", 180,
+                          ifelse(class_df$value %in% "Mammalia", 25, 180))
+
+class_df <- merge(referenceTableStudies[,c("fileName","species")],
+                   class_df,
+                   by.x = "species",by.y="name")
+
+
+saveRDS(class_df,paste0(pathTOfolder,"referenceTableStudies_taxonomy.rds"))
+class_df <- readRDS(paste0(pathTOfolder,"referenceTableStudies_taxonomy.rds"))
 
 
 # Calculate speeds
@@ -103,88 +104,98 @@ library(move2)
 flsMVs <- list.files(pthamt1h, full.names = F)
 flsMVs[flsMVs %in% class_df$fileName]
 
-results <- lapply(flsMVs, function(indPth)try({
-  amt_tr_1h <- readRDS(paste0(pthamt1h,indPth))
-  maxspeed <- class_df[class_df$fileName %in% indPth,4] # determine maxspeed, depending on taxonomy 
+results <- lapply(flsMVs, function(indPth) {
+  message("Processing: ", indPth)
+  tryCatch({
+    amt_tr_1h <- readRDS(paste0(pthamt1h,indPth))
+    maxspeed <- class_df[class_df$fileName %in% indPth,4] # determine maxspeed, depending on taxonomy
+    message("  maxspeed = ", maxspeed, " | nrow = ", nrow(amt_tr_1h))
 
-  ind_speed <- speed(amt_tr_1h) * 3.6 *100000 # speed in km/h 
-  amt_tr_1h$speed_km_h <- ind_speed # append speed to trkxy
-  amt_tr_1h_filtered <- amt_tr_1h %>% filter(speed_km_h <= maxspeed | is.na(amt_tr_1h$speed_km_h)) # filter by maxspeed, keep trailing position
-  amt_tr_1h_filtered <- dplyr::select(amt_tr_1h_filtered,-speed_km_h)
-  
-  saveRDS(amt_tr_1h_filtered, file=paste0(pthamt1hOutl,indPth))
-}))
+    ind_speed <- speed(amt_tr_1h) * 3.6 *100000 # speed in km/h 
+    amt_tr_1h$speed_km_h <- ind_speed # append speed to trkxy
+    amt_tr_1h_filtered <- amt_tr_1h %>% filter(speed_km_h <= maxspeed | is.na(amt_tr_1h$speed_km_h)) # filter by maxspeed, keep trailing position
+    amt_tr_1h_filtered <- dplyr::select(amt_tr_1h_filtered,-speed_km_h)
+    
+    saveRDS(amt_tr_1h_filtered, file=paste0(pthamt1hOutl,indPth))
+  }, error = function(e) {
+    message("  ERROR in ", indPth, ": ", conditionMessage(e))
+    NULL
+  }, warning = function(w) {
+    message("  WARNING in ", indPth, ": ", conditionMessage(w))
+    NULL
+  })
+})
 
 
 # END EDITS ANNE OCT 2025
 
-
-
-
-  ## remove speeds higher than threshold 20 -- remove top 0.15%
-  library(dplyr)
-  library(move2)
-  flsMVs <- list.files(pthamt1h, full.names = F)
-  # indPth <- flsMVs[1000]
-  start_time <- Sys.time()
-  maxspeed <- 20
-  results <- lapply(flsMVs, function(indPth)try({
-    print(indPth)
-    vultr <- readRDS(paste0(pthamt1h,indPth))
-    while(any(mt_speed(vultr, units="m/s")>set_units(maxspeed, m/s), na.rm = TRUE)){
-      vultr <- vultr %>% filter(mt_speed(., units="m/s")<=set_units(maxspeed, m/s) | is.na(mt_speed(., units="m/s")))
-    }
-    saveRDS(vultr, file=paste0(pthamt1hOutl,indPth))
-  }))
-  end_time <- Sys.time()
-  end_time - start_time # 40min
-  
-  is.error <- function(x) inherits(x, "try-error")
-  table(vapply(results, is.error, logical(1)))
-  names(results) <- seq_along(results)
-  results[vapply(results, is.error, logical(1))]
-  
-  ### remove outliers based on distance
-  ## check distribution of speeds
-  flsMVs <- list.files(pthamt1hOutl, full.names = T)
-  indPth <- flsMVs[1]
-  start_time <- Sys.time()
-  distL <- lapply(flsMVs, function(indPth){
-    vultr <- readRDS(indPth)
-    vultr_dist <- mt_distance(vultr, units="m")
-    return(vultr_dist)
-  })
-  end_time <- Sys.time()
-  end_time - start_time #10min
-  
-  distAll <- unlist(distL)
-  distAll <- distAll[!is.na(distAll)]
-  hist(distAll)
-  round(quantile(distAll, seq(0.9,1,0.01)),2)
-  hist(distAll[distAll<50000])
-  round(quantile(distAll, seq(0.999,1,0.00001)))
-  
-  dl <- distAll[distAll>1000000]
-  
-  
-  ## remove distances higher than threshold 1000K km -- remove top 0.0001%
-  library(dplyr)
-  library(move2)
-  flsMVs <- list.files(pthamt1hOutl, full.names = F)
-  # indPth <- flsMVs[1000]
-  start_time <- Sys.time()
-  maxdist <- 1000000
-  results <- lapply(flsMVs, function(indPth)try({
-    print(indPth)
-    vultr <- readRDS(paste0(pthamt1hOutl,indPth))
-    vultr <- vultr %>% filter(mt_distance(., units="m")<=set_units(maxdist, m) | is.na(mt_distance(., units="m")))
-    saveRDS(vultr, file=paste0(pthamt1hOutlDist,indPth))
-  }))
-  end_time <- Sys.time()
-  end_time - start_time # 25min
-  
-  is.error <- function(x) inherits(x, "try-error")
-  table(vapply(results, is.error, logical(1)))
-  names(results) <- seq_along(results)
-  results[vapply(results, is.error, logical(1))]
-})
+# 
+# 
+# 
+#   ## remove speeds higher than threshold 20 -- remove top 0.15%
+#   library(dplyr)
+#   library(move2)
+#   flsMVs <- list.files(pthamt1h, full.names = F)
+#   # indPth <- flsMVs[1000]
+#   start_time <- Sys.time()
+#   maxspeed <- 20
+#   results <- lapply(flsMVs, function(indPth)try({
+#     print(indPth)
+#     vultr <- readRDS(paste0(pthamt1h,indPth))
+#     while(any(mt_speed(vultr, units="m/s")>set_units(maxspeed, m/s), na.rm = TRUE)){
+#       vultr <- vultr %>% filter(mt_speed(., units="m/s")<=set_units(maxspeed, m/s) | is.na(mt_speed(., units="m/s")))
+#     }
+#     saveRDS(vultr, file=paste0(pthamt1hOutl,indPth))
+#   }))
+#   end_time <- Sys.time()
+#   end_time - start_time # 40min
+#   
+#   is.error <- function(x) inherits(x, "try-error")
+#   table(vapply(results, is.error, logical(1)))
+#   names(results) <- seq_along(results)
+#   results[vapply(results, is.error, logical(1))]
+#   
+#   ### remove outliers based on distance
+#   ## check distribution of speeds
+#   flsMVs <- list.files(pthamt1hOutl, full.names = T)
+#   indPth <- flsMVs[1]
+#   start_time <- Sys.time()
+#   distL <- lapply(flsMVs, function(indPth){
+#     vultr <- readRDS(indPth)
+#     vultr_dist <- mt_distance(vultr, units="m")
+#     return(vultr_dist)
+#   })
+#   end_time <- Sys.time()
+#   end_time - start_time #10min
+#   
+#   distAll <- unlist(distL)
+#   distAll <- distAll[!is.na(distAll)]
+#   hist(distAll)
+#   round(quantile(distAll, seq(0.9,1,0.01)),2)
+#   hist(distAll[distAll<50000])
+#   round(quantile(distAll, seq(0.999,1,0.00001)))
+#   
+#   dl <- distAll[distAll>1000000]
+#   
+#   
+#   ## remove distances higher than threshold 1000K km -- remove top 0.0001%
+#   library(dplyr)
+#   library(move2)
+#   flsMVs <- list.files(pthamt1hOutl, full.names = F)
+#   # indPth <- flsMVs[1000]
+#   start_time <- Sys.time()
+#   maxdist <- 1000000
+#   results <- lapply(flsMVs, function(indPth)try({
+#     print(indPth)
+#     vultr <- readRDS(paste0(pthamt1hOutl,indPth))
+#     vultr <- vultr %>% filter(mt_distance(., units="m")<=set_units(maxdist, m) | is.na(mt_distance(., units="m")))
+#     saveRDS(vultr, file=paste0(pthamt1hOutlDist,indPth))
+#   }))
+#   end_time <- Sys.time()
+#   end_time - start_time # 25min
+#   
+#   is.error <- function(x) inherits(x, "try-error")
+#   table(vapply(results, is.error, logical(1)))
+#   names(results) <- seq_along(results)
+#   results[vapply(results, is.error, logical(1))]
+# })
