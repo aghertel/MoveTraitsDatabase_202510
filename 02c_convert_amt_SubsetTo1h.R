@@ -52,8 +52,8 @@ results <- lapply(flsMV2, function(ind)try({
                   t=mt_time(mv2),
                   crs = sf::st_crs(mv2))
   ## remove geometry column and deployment_id if present as they are of no use
-  amt_tr <- amt_tr %>% dplyr::select(!geometry)
-  if("deployment_id"%in%names(amt_tr)){amt_tr <- amt_tr %>% select(!deployment_id)}
+  amt_tr <- amt_tr %>% dplyr::select(-geometry)
+  if("deployment_id"%in%names(amt_tr)){amt_tr <- amt_tr %>% select(-deployment_id)}
   
   amt_tr_1h <- amt_tr |> track_resample(rate = hours(1),
                                         tolerance = minutes(15))
