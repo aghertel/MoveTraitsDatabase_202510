@@ -23,6 +23,52 @@ source(here::here('trait_scripts', 'iou1m.R'))
 source(here::here('trait_scripts', 'iou12m.R'))
 source(here::here('trait_scripts', 'di.R'))
 
+
+# function to determine the hour of the day with the most hourly relocations
+# this hour will be used to resample the track to daily locations
+get_preferred_hour <- function(trk) {
+  tab <- tabulate(hour(trk$t_) + 1L, nbins = 24L)
+  if (length(unique(tab)) == 1L) return(12L)
+  which.max(tab) - 1L
+}
+
+
+daily_from_hourly <- function(trk, tolerance_mins = 60) {
+  dat <- as.data.frame(trk)
+  tz <- attr(dat$t_, "tzone")
+  pref_hour <- get_preferred_hour(trk)
+
+  # Vectorized: compute each row's target time based on its date
+  dates <- as.Date(dat$t_, tz = tz)
+  target_times <- as.POSIXct(
+    paste(dates, sprintf("%02d:00:00", pref_hour)),
+    tz = tz
+  )
+  diffs_mins <- abs(as.numeric(difftime(dat$t_, target_times, units = "mins")))
+
+  # Filter to within-tolerance rows, then keep closest per day
+  daily_df <- dat |>
+    mutate(.date = dates, .diff = diffs_mins) |>
+    filter(.diff <= tolerance_mins) |>
+    slice_min(.diff, n = 1, by = .date, with_ties = FALSE) |>
+    select(-.date, -.diff)
+
+  if (nrow(daily_df) == 0) return(NULL)
+
+  amt::make_track(
+    daily_df,
+    x_, y_, t_,
+    individual_local_identifier = individual_local_identifier,
+    tag_local_identifier = tag_local_identifier,
+    individual_id = individual_id,
+    study_id = study_id,
+    timestamp = timestamp,
+    burst_ = burst_,
+    crs = 4326
+  )
+}
+
+## ----Define path locations-------------------------------------------------------------
 pathTOfolder <- "./DATA/MoveTraitsData/"
 pathTOfolder2 <- "./DATA/MoveTraitsData/Movebank/"
 
@@ -57,18 +103,13 @@ referenceTableStudiesUsed <- referenceTableStudies[referenceTableStudies$exclude
 
 flsMV <- flsMV[flsMV %in% referenceTableStudiesUsed$fileName]
 
-# # Resume from the individual that crashed (inclusive)
-# restart_from <- "1190932284_2037908190.rds"
-# restart_idx <- which(flsMV == restart_from)
-# if (length(restart_idx) == 0) stop("restart_from file not found in flsMV: ", restart_from)
-# flsMV <- flsMV[restart_idx:length(flsMV)]
-
 # load data of one individual and apply all trait extraction functions its tracking data 
 
 failed_files <- character(0)
 
 lapply(flsMV, function(indPth)
   {
+  indPth = flsMV[400]
   animlocs.1hourly <- readRDS(file.path(pthamt1h, indPth))
   print(indPth)
   
@@ -77,10 +118,9 @@ lapply(flsMV, function(indPth)
 ## ----Resample data-------------------------------------------------------------
 #Resample data to 24h time scales using amt
 
-animlocs.daily <- animlocs.1hourly |>
-  track_resample(rate = hours(24),
-               tolerance = minutes(60))
-
+animlocs.daily <- animlocs.1hourly  |>
+  daily_from_hourly(tolerance_mins = 60)
+    
 ## ----Trait extraction-------------------------------------------------------------
 
 #1h displacement----
