@@ -10,18 +10,18 @@ library(dggridR);library(mapview);library(ISOweek);library(sf)
 
 ## ----Import functions for traits-------------------------------------------------------------
 
-source(here::here('updates_work_in_progress/trait_scripts', 'd1h.R'))
-source(here::here('updates_work_in_progress/trait_scripts', 'd24h.R'))
-source(here::here('updates_work_in_progress/trait_scripts', 'dmax24h.R'))
-source(here::here('updates_work_in_progress/trait_scripts', 'dmax1m.R'))
-source(here::here('updates_work_in_progress/trait_scripts', 'dmax12m.R'))
-source(here::here('updates_work_in_progress/trait_scripts', 'mcp24h.R'))
-source(here::here('updates_work_in_progress/trait_scripts', 'mcp1m.R'))
-source(here::here('updates_work_in_progress/trait_scripts', 'mcp12m.R'))
-source(here::here('updates_work_in_progress/trait_scripts', 'iou24h.R'))
-source(here::here('updates_work_in_progress/trait_scripts', 'iou1m.R'))
-source(here::here('updates_work_in_progress/trait_scripts', 'iou12m.R'))
-source(here::here('updates_work_in_progress/trait_scripts', 'di.R'))
+source(here::here('trait_scripts', 'd1h.R'))
+source(here::here('trait_scripts', 'd24h.R'))
+source(here::here('trait_scripts', 'dmax24h.R'))
+source(here::here('trait_scripts', 'dmax1m.R'))
+source(here::here('trait_scripts', 'dmax12m.R'))
+source(here::here('trait_scripts', 'mcp24h.R'))
+source(here::here('trait_scripts', 'mcp1m.R'))
+source(here::here('trait_scripts', 'mcp12m.R'))
+source(here::here('trait_scripts', 'iou24h.R'))
+source(here::here('trait_scripts', 'iou1m.R'))
+source(here::here('trait_scripts', 'iou12m.R'))
+source(here::here('trait_scripts', 'di.R'))
 
 # amt function to make one track per individual with hourly steps
 make_and_resample_track <- function(x, sampling.interval = 1, tolerance = 15){
@@ -46,17 +46,9 @@ make_and_resample_track <- function(x, sampling.interval = 1, tolerance = 15){
 # function to determine the hour of the day with the most hourly relocations
 # this hour will be used to resample the track to daily locations
 get_preferred_hour <- function(trk) {
-  dat <- as.data.frame(trk)
-  
-  hour_counts <- dat %>%
-    mutate(hr = hour(t_)) %>%
-    count(hr, name = "n") %>%
-    complete(hr = 0:23, fill = list(n = 0))
-  
-  if (length(unique(hour_counts$n)) == 1) return(12)
-  
-  max_n <- max(hour_counts$n)
-  min(hour_counts$hr[hour_counts$n == max_n])
+  tab <- tabulate(hour(trk$t_) + 1L, nbins = 24L)
+  if (length(unique(tab)) == 1L) return(12L)
+  which.max(tab) - 1L
 }
 
 
@@ -64,25 +56,24 @@ daily_from_hourly <- function(trk, tolerance_mins = 60) {
   dat <- as.data.frame(trk)
   tz <- attr(dat$t_, "tzone")
   pref_hour <- get_preferred_hour(trk)
-  
-  days <- seq.Date(min(as.Date(dat$t_)), max(as.Date(dat$t_)), by = "day")
-  
-  daily_df <- map_dfr(days, function(d) {
-    target_time <- as.POSIXct(
-      paste(d, sprintf("%02d:00:00", pref_hour)),
-      tz = tz
-    )
-    
-    diffs <- abs(difftime(dat$t_, target_time, units = "mins"))
-    idx <- which(diffs <= tolerance_mins)
-    
-    if (length(idx) == 0) return(NULL)
-    
-    j <- idx[which.min(diffs[idx])]
-    dat[j, ] %>%
-      mutate(target_day = d, target_hour = pref_hour, target_time = target_time)
-  })
-  
+
+  # Vectorized: compute each row's target time based on its date
+  dates <- as.Date(dat$t_, tz = tz)
+  target_times <- as.POSIXct(
+    paste(dates, sprintf("%02d:00:00", pref_hour)),
+    tz = tz
+  )
+  diffs_mins <- abs(as.numeric(difftime(dat$t_, target_times, units = "mins")))
+
+  # Filter to within-tolerance rows, then keep closest per day
+  daily_df <- dat |>
+    mutate(.date = dates, .diff = diffs_mins) |>
+    filter(.diff <= tolerance_mins) |>
+    slice_min(.diff, n = 1, by = .date, with_ties = FALSE) |>
+    select(-.date, -.diff)
+
+  if (nrow(daily_df) == 0) return(NULL)
+
   amt::make_track(
     daily_df,
     x_, y_, t_,
@@ -97,26 +88,26 @@ daily_from_hourly <- function(trk, tolerance_mins = 60) {
   )
 }
 
-#' 
-#' # Aim
-#' 
-#' We here provide code for a first version of the MoveTraits database. MoveTraits uses animal movement data collected from GPS sensors to summarize a suite of movement metrics on the individual level. 
-#' 
-#' The workflow is as follow:
-#' 1. resampling of the raw GPS relocation data to regular time intervals, here: 1hour, 24 hour
-#' 2. using resampled data to quantify movement metrics 
-#'   a) using these resampled data to build regular movement trajectories to quantify step lengths of successive locations (at the hourly or 24 hourly rate)
-#'   b) using resampled data to quantify maximum displacement within a set time interval from all pairwise distance comparisons
-#'   c) 
-#' 3. summarize each metric to obtain one value per individual (mean, median, cv, 5 & 95 %ile)
-#' 4. create a database with metrics summarized at the indivdual level AND provide the raw metrics without spatial information
-#' 
-#' We here compile a first version from open access data obtained from Tucker et al. 2023 "Behavioral responses of terrestrial mammals to COVID-19 lockdowns" (https://zenodo.org/records/7704108, file ""). 
-#' 
-#' We only used data from 2019 (i.e., not from 2020 during COVID lockdowns).
-#' 
-#' ## Load a prepare raw spatial data
-#' 
+
+# Aim
+
+# We here provide code for a first version of the MoveTraits database. MoveTraits uses animal movement data collected from GPS sensors to summarize a suite of movement metrics on the individual level.
+
+# The workflow is as follow:
+# 1. resampling of the raw GPS relocation data to regular time intervals, here: 1hour, 24 hour
+# 2. using resampled data to quantify movement metrics
+#   a) using these resampled data to build regular movement trajectories to quantify step lengths of successive locations (at the hourly or 24 hourly rate)
+#   b) using resampled data to quantify maximum displacement within a set time interval from all pairwise distance comparisons
+#   c)
+# 3. summarize each metric to obtain one value per individual (mean, median, cv, 5 & 95 %ile)
+# 4. create a database with metrics summarized at the indivdual level AND provide the raw metrics without spatial information
+# 
+# We here compile a first version from open access data obtained from Tucker et al. 2023 "Behavioral responses of terrestrial mammals to COVID-19 lockdowns" (https://zenodo.org/records/7704108, file "").
+# 
+# We only used data from 2019 (i.e., not from 2020 during COVID lockdowns).
+
+## Load a prepare raw spatial data
+
 
 ## ----load data--------------------------------------------------------------------------------------------------------
 movedata <- readRDS("./DATA/Tucker/Tucker_Road_Spatial.rds")
@@ -150,17 +141,13 @@ animlocs.1hourly <- movedata %>%
   group_split() %>%
   map(~ make_and_resample_track(., sampling.interval = 1,
                                  tolerance = 15)) %>%
-  setNames(unique(movedata$individual_id))
+  setNames(sort(unique(movedata$individual_id)))
 
 ## ----Resample data to 24 hrs-------------------------------------------------------------
 #Resample data to 24h time scales using amt
 
-animlocs.daily <- animlocs.1hourly  |> 
+animlocs.daily <- animlocs.1hourly  |>
   map(~ daily_from_hourly(.x, tolerance_mins = 60))
-
-animlocs.daily <- animlocs.1hourly |> 
-  map(~ track_resample(.x, rate = hours(24),
-                       tolerance = minutes(60)))
 
 ## ----Calculate movement metrics-------------------------------------------------------------
 
