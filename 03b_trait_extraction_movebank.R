@@ -68,9 +68,34 @@ daily_from_hourly <- function(trk, tolerance_mins = 60) {
   )
 }
 
+# function null_spatial_cols sets spatial annotation that is finer than the data owner agreed
+# to NA
+#   "observation" -> no changes
+#   "1"           -> raw coordinate cols set to NA; all grid IDs retained
+#   "10"          -> raw coords + grid.id.1km set to NA; grid.id.10km and grid.id.100km retained
+#   "100"         -> raw coords + grid.id.1km + grid.id.10km set to NA; only grid.id.100km retained
+null_spatial_cols <- function(df, within_individual, coord_cols) {
+  if (is.null(df) || nrow(df) == 0) return(df)
+  if (is.null(within_individual) || is.na(within_individual) || within_individual == "observation") return(df)
+  if (within_individual %in% c("1", "10", "100")) {
+    for (col in intersect(coord_cols, names(df))) df[[col]] <- NA
+  }
+  if (within_individual %in% c("10", "100")) {
+    if ("grid.id.1km"  %in% names(df)) df[["grid.id.1km"]]  <- NA
+  }
+  if (within_individual == "100") {
+    if ("grid.id.10km" %in% names(df)) df[["grid.id.10km"]] <- NA
+  }
+  df
+}
+
 ## ----Define path locations-------------------------------------------------------------
+
 pathTOfolder <- "./DATA/MoveTraitsData/"
 pathTOfolder2 <- "./DATA/MoveTraitsData/Movebank/"
+
+# import data agraament
+agreements <- readRDS("./DATA/MoveTraitsData/data_agreements/data_agreements.rds")
 
 ## ----Import movement data per individual-------------------------------------------------------------
 pthamt1h <- paste0(pathTOfolder,"4.MB_indv_amt_1h/")
@@ -115,6 +140,9 @@ lapply(flsMV, function(indPth)
   
   tryCatch({
   
+    # EXAMPLE'
+    animlocs.1hourly <- readRDS(file.path(pthamt1h, "1176017658_1176029771.rds"))
+
 ## ----Resample data-------------------------------------------------------------
 #Resample data to 24h time scales using amt
 
@@ -124,59 +152,59 @@ animlocs.daily <- animlocs.1hourly  |>
 ## ----Trait extraction-------------------------------------------------------------
 
 #1h displacement----
-d1h <- calc_d1h(animlocs.1hourly, dggs.10, dggs.1)
+d1h <- calc_d1h(animlocs.1hourly, dggs.100, dggs.10, dggs.1)
 sum.ind.d1h <- f_sum.ind.d1h(d1h) 
 sum.monthly.ind.d1h <- f_sum.monthly.ind.d1h(d1h)
 
 #24hr displacement distance----
-d24h <- calc_d24h(animlocs.daily, dggs.10, dggs.1)
+d24h <- calc_d24h(animlocs.daily, dggs.100, dggs.10, dggs.1)
 sum.ind.d24h <- f_sum.ind.d24h(d24h)
 sum.monthly.ind.d24h <- f_sum.monthly.ind.d24h(d24h)
 
 #Maximum 24hr displacement----
-dmax24h <- calc_dmax24h(animlocs.1hourly, dggs.10, dggs.1)
+dmax24h <- calc_dmax24h(animlocs.1hourly, dggs.100, dggs.10, dggs.1)
 sum.ind.dmax24h <- f_sum.ind.dmax24h(dmax24h)
 sum.monthly.ind.dmax24h <- f_sum.monthly.ind.dmax24h(dmax24h)
 
 #Maximum 1month displacement distance----
-dmax1m <- calc_dmax1m(animlocs.daily, dggs.10, dggs.1)
+dmax1m <- calc_dmax1m(animlocs.daily, dggs.100, dggs.10, dggs.1)
 sum.ind.dmax1m <- f_sum.ind.dmax1m(dmax1m)
 sum.monthly.ind.dmax1m <- f_sum.monthly.ind.dmax1m(dmax1m)
 
 #Maximum annual displacement distance----
-dmax12m <- calc_dmax12m(animlocs.daily, dggs.10, dggs.1)
+dmax12m <- calc_dmax12m(animlocs.daily, dggs.100, dggs.10, dggs.1)
 sum.ind.dmax12m <- f_sum.ind.dmax12m(dmax12m)
 
 #Daily MCP----
-mcp24h <- calc_mcp24h(animlocs.1hourly, dggs.10, dggs.1)
+mcp24h <- calc_mcp24h(animlocs.1hourly, dggs.100, dggs.10, dggs.1)
 sum.ind.mcp24h <- f_sum.ind.mcp24h(mcp24h)
 sum.monthly.ind.mcp24h <- f_sum.monthly.ind.mcp24h(mcp24h)
 
 #Monthly MCP----
-mcp1m <- calc_mcp1m(animlocs.daily, dggs.10, dggs.1)
+mcp1m <- calc_mcp1m(animlocs.daily, dggs.100, dggs.10, dggs.1)
 sum.ind.mcp1m <- f_sum.ind.mcp1m(mcp1m)
 sum.monthly.ind.mcp1m <- f_sum.monthly.ind.mcp1m(mcp1m)
 
 #Annual MCP----
-mcp12m <- calc_mcp12m(animlocs.daily, dggs.10, dggs.1)
+mcp12m <- calc_mcp12m(animlocs.daily, dggs.100, dggs.10, dggs.1)
 sum.ind.mcp12m <- f_sum.ind.mcp12m(mcp12m)
 
 #Daily IOU----
-iou24h <- calc_iou24h(mcp24h,d1h, dggs.10, dggs.1)
+iou24h <- calc_iou24h(mcp24h, d1h)
 sum.ind.iou24h <- f_sum.ind.iou24h(iou24h)
 sum.monthly.ind.iou24h <- f_sum.monthly.ind.iou24h(iou24h)
 
 #Monthly IOU----
-iou1m <- calc_iou1m(mcp1m,d24h, dggs.10, dggs.1)
+iou1m <- calc_iou1m(mcp1m, d24h)
 sum.ind.iou1m <- f_sum.ind.iou1m(iou1m)
 sum.monthly.ind.iou1m <- f_sum.monthly.ind.iou1m(iou1m) 
 
 #Annual IOU----
-iou12m <- calc_iou12m(mcp12m,d24h, dggs.10, dggs.1)
+iou12m <- calc_iou12m(mcp12m,d24h)
 sum.ind.iou12m <- f_sum.ind.iou12m(iou12m)
 
 #Diurnality Index----
-di <- calc_di(d1h, dggs.10, dggs.1)
+di <- calc_di(d1h, dggs.100, dggs.10, dggs.1)
 sum.ind.di <- f_sum.ind.di(di)
 sum.monthly.ind.di <- f_sum.monthly.ind.di(di)
 
@@ -275,11 +303,20 @@ id_monthly_10km <- id_monthly |>
   summarise(grid.id.10km = paste(grid.id.10km, collapse = ";"),
             .groups = "drop")
 
+cell_info.1 <- dgGEO_to_SEQNUM(dggs.1, animlocs.1hourly$x_, animlocs.1hourly$y_)
+id_monthly$grid.id.1km <- cell_info.10$seqnum
+id_monthly_1km <- id_monthly |>
+  distinct(month_year,grid.id.1km,.keep_all = TRUE) |> 
+  group_by(individual_id,study_id,month, year) |>               
+  summarise(grid.id.1km = paste(grid.id.1km, collapse = ";"),
+            .groups = "drop")
+
 #join database
 MoveTrait.monthly.ind.sum <- 
   if (is.null(MoveTrait.monthly.ind.sum) | nrow(MoveTrait.monthly.ind.sum) == 0) NULL else {
     id_monthly_100km  |>  
       left_join(id_monthly_10km, by =  join_by(individual_id, study_id, month, year)) %>% 
+      left_join(id_monthly_1km, by =  join_by(individual_id, study_id, month, year)) %>% 
       left_join(MoveTrait.monthly.ind.sum, by =  join_by(individual_id, month, year)) %>% 
       droplevels()  }
 
@@ -287,6 +324,14 @@ MoveTrait.monthly.ind.sum <-
 saveRDS(MoveTrait.monthly.ind.sum, file=paste0(pthtraitsummonthly,indPth))
 
 ## ----Build full database including raw metrics data--------------------
+# Make sure to set spatial information that is finer than the agreed resolution to NA  
+# Look up within_individual spatial resolution restriction for this study
+wi <- agreements |>
+  filter(as.character(Study_id) == as.character(unique(animlocs.1hourly$study_id)[1])) |>
+  pull(within_individual)
+wi <- if (length(wi) == 0 || all(is.na(wi))) "observation" else as.character(wi[1])
+
+wi <- "1"
 
 MoveTrait.repeats <- 
   if (is.null(MoveTrait.ind.sum)) NULL else {
@@ -301,48 +346,56 @@ MoveTrait.repeats <-
   {if (!is.null(d1h)) left_join(.,  d1h %>%
                                     data.frame %>%
                                     mutate(individual_id = as.character(individual_id)) %>%
+                                    null_spatial_cols(wi, c("lon", "lat")) %>%
                 tidyr::nest(d1h = -individual_id), 
             by = c("individual_id" = "individual_id"))  else .} %>% 
   
   # 24 hourly
   {if (!is.null(d24h)) left_join(.,  d24h %>%
                                     mutate(individual_id = as.character(individual_id)) %>%
+                                    null_spatial_cols(wi, c("lon", "lat")) %>%
                 tidyr::nest(d24h = -individual_id), 
             by = c("individual_id" = "individual_id")) else .}  %>% 
   
   # Dmax24
   {if (!is.null(dmax24h)) left_join(.,  dmax24h %>%
                                     mutate(individual_id = as.character(individual_id)) %>%
+                                    null_spatial_cols(wi, c("lon_start", "lat_start", "lon_end", "lat_end")) %>%
             tidyr::nest(dmax24h = -individual_id), 
             by = c("individual_id" = "individual_id"))  else .} %>% 
   
   # Dmax1m
   {if (!is.null(dmax1m)) left_join(.,  dmax1m %>%
                                      mutate(individual_id = as.character(individual_id)) %>%
+                                     null_spatial_cols(wi, c("lon_start", "lat_start", "lon_end", "lat_end")) %>%
                 tidyr::nest(dmax1m = -individual_id), 
             by = c("individual_id" = "individual_id"))  else .} %>% 
 
   # Dmax12m
   {if (!is.null(dmax12m)) left_join(.,  dmax12m %>%
                                       mutate(individual_id = as.character(individual_id)) %>%
+                                      null_spatial_cols(wi, c("lon_start", "lat_start", "lon_end", "lat_end")) %>%
                 tidyr::nest(dmax12m = -individual_id), 
             by = c("individual_id" = "individual_id"))  else .} %>% 
   
   # mcp.daily
   {if (!is.null(mcp24h)) left_join(.,  mcp24h %>%
                                         mutate(individual_id = as.character(individual_id)) %>%
+                                        null_spatial_cols(wi, c("x_vertices", "y_vertices")) %>%
                 tidyr::nest(mcp24h = -individual_id), 
             by = c("individual_id" = "individual_id"))  else .} %>% 
   
   # mcp.monthly
   {if (!is.null(mcp1m)) left_join(.,  mcp1m %>%
                                           mutate(individual_id = as.character(individual_id)) %>%
+                                          null_spatial_cols(wi, c("x_vertices", "y_vertices")) %>%
                 tidyr::nest(mcp1m = -individual_id), 
             by = c("individual_id" = "individual_id"))  else .} %>% 
 
   # mcp.annual
   {if (!is.null(mcp12m)) left_join(.,  mcp12m %>%
                                          mutate(individual_id = as.character(individual_id)) %>%
+                                         null_spatial_cols(wi, c("x_vertices", "y_vertices")) %>%
                 tidyr::nest(mcp12m = -individual_id), 
             by = c("individual_id" = "individual_id"))  else .} %>% 
 
@@ -350,6 +403,7 @@ MoveTrait.repeats <-
   {if (!is.null(iou24h)) left_join(.,  iou24h %>%
               ungroup() |>
                 mutate(individual_id = as.character(individual_id)) %>%
+                null_spatial_cols(wi, c("x_vertices", "y_vertices")) %>%
                 tidyr::nest(iou24h = -individual_id), 
             by = c("individual_id" = "individual_id"))  else .} %>% 
 
@@ -357,6 +411,7 @@ MoveTrait.repeats <-
   {if (!is.null(iou1m)) left_join(.,  iou1m %>%
               ungroup() |> 
                 mutate(individual_id = as.character(individual_id)) %>%
+                null_spatial_cols(wi, c("x_vertices", "y_vertices")) %>%
                 tidyr::nest(iou1m = -individual_id), 
             by = c("individual_id" = "individual_id"))  else .} %>% 
 
@@ -364,12 +419,14 @@ MoveTrait.repeats <-
   {if (!is.null(iou12m)) left_join(.,  iou12m %>%
               ungroup() |>
                 mutate(individual_id = as.character(individual_id)) %>%
+                null_spatial_cols(wi, c("x_vertices", "y_vertices")) %>%
                 tidyr::nest(iou12m = -individual_id), 
             by = c("individual_id" = "individual_id"))  else .} %>% 
 
   # Diurnality Index
   {if (!is.null(di)) left_join(.,  di %>%
                                  mutate(individual_id = as.character(individual_id)) %>%
+                                 null_spatial_cols(wi, c("mean.x", "mean.y")) %>%
                 tidyr::nest(di = -individual_id), 
             by = c("individual_id" = "individual_id"))  else .} }
 
