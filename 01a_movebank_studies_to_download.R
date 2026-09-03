@@ -42,8 +42,8 @@ all_open <- all[which(all$license_type %in% c("CC_0", "CC_BY", "CC_BY_NC")), ]
 all_open$access <- "open"
 
 ### making one large table and removing duplicated studies
-allstudies <- all_open
-#allstudies <- rbind(all_shared,all_open)
+#allstudies <- all_open
+allstudies <- rbind(all_shared,all_open)
 allstudies <- allstudies[!duplicated(allstudies$id), ] ## when duplicated, entry from all shared will be kept
 ###--### in case the people should be contacted
 allstudies_noTaxon <- allstudies[is.na(allstudies$taxon_ids), ]
