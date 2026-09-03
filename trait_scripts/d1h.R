@@ -1,6 +1,7 @@
 
 ## ----1h displacement-------------------------------------------------------------
 calc_d1h <- function(trk,
+                     dggs_100,
                      dggs_10,
                      dggs_1,
                      min_n = 167,
@@ -25,6 +26,10 @@ calc_d1h <- function(trk,
   # drop if too short
   if (nrow(out) < min_n) return(NULL)
   
+  # spatial annotation 100 km
+  cell_info_100 <- dgGEO_to_SEQNUM(dggs_100, out$lon, out$lat)
+  out$grid.id.100km <- cell_info_100$seqnum
+
   # spatial annotation 10 km
   cell_info_10 <- dgGEO_to_SEQNUM(dggs_10, out$lon, out$lat)
   out$grid.id.10km <- cell_info_10$seqnum
