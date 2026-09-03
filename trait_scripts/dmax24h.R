@@ -1,8 +1,9 @@
 ## ----Maximum 24hr displacement-------------------------------------------------------------
 
 calc_dmax24h <- function(trk, 
-                         dggs.10, 
-                         dggs.1, 
+                         dggs_100,
+                         dggs_10, 
+                         dggs_1, 
                          min_daily_n = 12, 
                          min_ymd_n = 7) 
   {
@@ -49,15 +50,21 @@ dmax24h <-
   if (is.null(dmax24h) || nrow(dmax24h) == 0) return(NULL)
  
 if(is.null(dmax24h)) NULL else {
-  # Spatial annotation 10km
-  cell_info_10.a <- dgGEO_to_SEQNUM(dggs.10, dmax24h$lon_start, dmax24h$lat_start)
-  cell_info_10.b <- dgGEO_to_SEQNUM(dggs.10, dmax24h$lon_end, dmax24h$lat_end)
+  # Spatial annotation 100km
+  cell_info_100.a <- dgGEO_to_SEQNUM(dggs_100, dmax24h$lon_start, dmax24h$lat_start)
+  cell_info_100.b <- dgGEO_to_SEQNUM(dggs_100, dmax24h$lon_end, dmax24h$lat_end)
+  dmax24h$grid.id.100km <- cell_info_100.a$seqnum
+  dmax24h$grid.id.100km <- paste(dmax24h$grid.id.100km,cell_info_100.b$seqnum,sep=";")
+  
+    # Spatial annotation 10km
+  cell_info_10.a <- dgGEO_to_SEQNUM(dggs_10, dmax24h$lon_start, dmax24h$lat_start)
+  cell_info_10.b <- dgGEO_to_SEQNUM(dggs_10, dmax24h$lon_end, dmax24h$lat_end)
   dmax24h$grid.id.10km <- cell_info_10.a$seqnum
   dmax24h$grid.id.10km <- paste(dmax24h$grid.id.10km,cell_info_10.b$seqnum,sep=";")
   
   # Spatial annotation 1km
-  cell_info_1.a <- dgGEO_to_SEQNUM(dggs.1, dmax24h$lon_start, dmax24h$lat_start)
-  cell_info_1.b <- dgGEO_to_SEQNUM(dggs.1, dmax24h$lon_end, dmax24h$lat_end)
+  cell_info_1.a <- dgGEO_to_SEQNUM(dggs_1, dmax24h$lon_start, dmax24h$lat_start)
+  cell_info_1.b <- dgGEO_to_SEQNUM(dggs_1, dmax24h$lon_end, dmax24h$lat_end)
   dmax24h$grid.id.1km <- cell_info_1.a$seqnum
   dmax24h$grid.id.1km <- paste(dmax24h$grid.id.1km,cell_info_1.b$seqnum,sep=";")
   

@@ -1,5 +1,6 @@
 ## ----Maximum monthly displacement distance-------------------------------------------------------------
 calc_dmax1m <- function(trk, 
+                        dggs_100,
                          dggs_10, 
                          dggs_1, 
                          min_monthly_n = 18 # 20 days? hours?
@@ -49,15 +50,21 @@ dmax1m <-
 if (is.null(dmax1m) || nrow(dmax1m) == 0) return(NULL)
 
 if(is.null(dmax1m)) NULL else {
-  # Spatial annotation 10km
-  cell_info_10.a <- dgGEO_to_SEQNUM(dggs.10, dmax1m$lon_start, dmax1m$lat_start)
-  cell_info_10.b <- dgGEO_to_SEQNUM(dggs.10, dmax1m$lon_end, dmax1m$lat_end)
+  # Spatial annotation 100km
+  cell_info_100.a <- dgGEO_to_SEQNUM(dggs_100, dmax1m$lon_start, dmax1m$lat_start)
+  cell_info_100.b <- dgGEO_to_SEQNUM(dggs_100, dmax1m$lon_end, dmax1m$lat_end)
+  dmax1m$grid.id.100km <- cell_info_100.a$seqnum
+  dmax1m$grid.id.100km <- paste(dmax1m$grid.id.100km,cell_info_100.b$seqnum,sep=";")
+
+    # Spatial annotation 10km
+  cell_info_10.a <- dgGEO_to_SEQNUM(dggs_10, dmax1m$lon_start, dmax1m$lat_start)
+  cell_info_10.b <- dgGEO_to_SEQNUM(dggs_10, dmax1m$lon_end, dmax1m$lat_end)
   dmax1m$grid.id.10km <- cell_info_10.a$seqnum
   dmax1m$grid.id.10km <- paste(dmax1m$grid.id.10km,cell_info_10.b$seqnum,sep=";")
   
   # Spatial annotation 1km
-  cell_info_1.a <- dgGEO_to_SEQNUM(dggs.1, dmax1m$lon_start, dmax1m$lat_start)
-  cell_info_1.b <- dgGEO_to_SEQNUM(dggs.1, dmax1m$lon_end, dmax1m$lat_end)
+  cell_info_1.a <- dgGEO_to_SEQNUM(dggs_1, dmax1m$lon_start, dmax1m$lat_start)
+  cell_info_1.b <- dgGEO_to_SEQNUM(dggs_1, dmax1m$lon_end, dmax1m$lat_end)
   dmax1m$grid.id.1km <- cell_info_1.a$seqnum
   dmax1m$grid.id.1km <- paste(dmax1m$grid.id.1km,cell_info_1.b$seqnum,sep=";")
   

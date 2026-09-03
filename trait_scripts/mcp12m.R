@@ -65,6 +65,7 @@ get_polygon_vertices <- function(mcp_spdf) {
 
 ## ----Annual MCP-------------------------------------------------------------
 calc_mcp12m <- function(trk, 
+                       dggs_100,
                        dggs_10, 
                        dggs_1, 
                        min_locs_n = 150,
@@ -123,11 +124,13 @@ calc_mcp12m <- function(trk,
   
   if (nrow(vertices_long) == 0) return(NULL)
   
+  grid_100 <- dgGEO_to_SEQNUM(dggs_100, vertices_long$x_vertices, vertices_long$y_vertices)$seqnum
   grid_10 <- dgGEO_to_SEQNUM(dggs_10, vertices_long$x_vertices, vertices_long$y_vertices)$seqnum
   grid_1  <- dgGEO_to_SEQNUM(dggs_1,  vertices_long$x_vertices, vertices_long$y_vertices)$seqnum
   
   vertices_long <- vertices_long |>
     dplyr::mutate(
+      grid.id.100km = grid_100,
       grid.id.10km = grid_10,
       grid.id.1km = grid_1
     )
@@ -137,6 +140,7 @@ calc_mcp12m <- function(trk,
     dplyr::summarise(
       x_vertices = paste(x_vertices, collapse = ";"),
       y_vertices = paste(y_vertices, collapse = ";"),
+      grid.id.100km = paste(sort(unique(grid.id.100km[!is.na(grid.id.100km)])), collapse = ";"),
       grid.id.10km = paste(sort(unique(grid.id.10km[!is.na(grid.id.10km)])), collapse = ";"),
       grid.id.1km = paste(sort(unique(grid.id.1km[!is.na(grid.id.1km)])), collapse = ";"),
       .groups = "drop"
