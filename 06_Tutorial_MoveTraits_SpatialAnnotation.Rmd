@@ -80,7 +80,7 @@ We load the species level database which contains one row per species with trait
 mt_sp <- readRDS("MoveTrait.v0.1_species.sum_20260807.rds")
 ```
 
-Spatial annotations are stored in the columns **grid.id.100km** and **grid.id.10km**.
+The spatial annotation for species trait summaries are stored in the column **grid.id.100km**.
 
 ```{r}
 colnames(mt_sp)
@@ -113,20 +113,20 @@ intersect_cells_100 <- dgcellstogrid(dggs.100, grid.id.100km)
 mapview(intersect_cells_100, map.types = c("OpenStreetMap.DE"), col.regions = "#CC5500", legend = FALSE)
 ```
 
-We can do the same for the finer 10 km grid cells. Here for example for Fishers.
+Or for example for Fishers:
 
 ```{r}
 focal_species <- "Martes pennanti"
 
-grid.id.10km <- mt_sp |>
+grid.id.100km <- mt_sp |>
   filter(species == focal_species) |>
-  pull(grid.id.10km) |>
+  pull(grid.id.100km) |>
   strsplit(";") |>
   unlist() |>
   as.numeric()
 
-intersect_cells_10 <- dgcellstogrid(dggs.10, grid.id.10km)
-mapview(intersect_cells_10, map.types = c("OpenStreetMap.DE"), col.regions = "#CC5500", legend = FALSE)
+intersect_cells_100 <- dgcellstogrid(dggs.100, grid.id.100km)
+mapview(intersect_cells_100, map.types = c("OpenStreetMap.DE"), col.regions = "#CC5500", legend = FALSE)
 ```
 
 In the remainder of the tutorial we will demonstrate grid cell annotation using three exemplary individuals, one stork, one fisher, and one lion. All functions work for every individual, provided the trait of interest could be calculated.
