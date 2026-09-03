@@ -1,9 +1,6 @@
 ## ----Annual IOU-------------------------------------------------------------
 
-calc_iou12m <- function(area,
-                        trk,
-                        dggs_10, 
-                        dggs_1) 
+calc_iou12m <- function(area, trk) 
 {
 
 tmp.mcp12m <- 
@@ -16,25 +13,19 @@ iou12m <-
   if(is.null(trk) | is.null(tmp.mcp12m)) NULL else {
     trk  |>   
       mutate(id_year = paste(individual_id,year,sep="."))  |>  group_by(id_year) |>  
-      mutate(cumsum.d24h = sum(d24h,na.rm=T),
-             mean.x = mean(lon),
-             mean.y = mean(lat)) |>  
-      dplyr::select(id_year,year,individual_id,cumsum.d24h,mean.x,mean.y) |>  distinct() |> 
-      left_join(tmp.mcp12m[,c("id_year","area")],by = "id_year") |>  
+      mutate(cumsum.d24h = sum(d24h,na.rm=T)) |>  
+      dplyr::select(id_year,year,individual_id,cumsum.d24h) |>  
+      distinct() |> 
+      left_join(tmp.mcp12m[,c("id_year","area", "x_vertices", "y_vertices",
+                              "grid.id.100km", "grid.id.10km", "grid.id.1km")],
+                by = "id_year") |>  
       mutate(iou12m = cumsum.d24h/sqrt(area)) |> 
       filter(!is.na(iou12m)) |>  ungroup() |> 
-    dplyr::select(individual_id,year,iou12m,mean.x,mean.y)
+    dplyr::select(individual_id,year,iou12m,
+                  x_vertices, y_vertices, grid.id.100km, grid.id.10km, grid.id.1km)
   }
 
 if(is.null(iou12m) || nrow(iou12m) == 0) return(NULL)
-
-# Spatial annotation 10km
-cell_info_10 <- dgGEO_to_SEQNUM(dggs.10, iou12m$mean.x, iou12m$mean.y)
-iou12m$grid.id.10km <- cell_info_10$seqnum
-
-# Spatial annotation 1km
-cell_info_1 <- dgGEO_to_SEQNUM(dggs.1, iou12m$mean.x, iou12m$mean.y)
-iou12m$grid.id.1km <- cell_info_1$seqnum
 
 return(iou12m)
 }

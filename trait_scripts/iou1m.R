@@ -1,41 +1,32 @@
 ## ----Monthly IOU-------------------------------------------------------------
-calc_iou1m <- function(area,
-                        trk,
-                        dggs_10, 
-                        dggs_1) 
+calc_iou1m <- function(area, trk) 
 {
   tmp.mcp1m <- 
     if(is.null(area)) NULL else {
-    area|>
-      mutate(id_month = paste(individual_id,year_month,sep="."))
+    area |>
+      mutate(id_month = paste(individual_id, year_month, sep="."))
   }
 
 iou1m <- 
   if(is.null(trk) | is.null(tmp.mcp1m)) NULL else {
-    trk  %>%  
-      mutate(year_month = paste(year,month,sep="_"),
-             id_month = paste(individual_id,year_month,sep="."))  |>  group_by(id_month)  |>  
-      mutate(cumsum.d24h = sum(d24h,na.rm=T),
-             mean.x = mean(lon),
-             mean.y = mean(lat))  |>  
-      dplyr::select(individual_id,id_month,month,year,year_month,cumsum.d24h,mean.x,mean.y)  |>
+    trk %>%  
+      mutate(year_month = paste(year, month, sep="_"),
+             id_month = paste(individual_id, year_month, sep=".")) |> group_by(id_month) |>  
+      mutate(cumsum.d24h = sum(d24h, na.rm=T)) |>  
+      dplyr::select(individual_id, id_month, month, year, year_month, cumsum.d24h) |>
       distinct() |> 
-      left_join(tmp.mcp1m[,c("id_month","area")],by = "id_month")  |>  
-      mutate(iou1m = cumsum.d24h/sqrt(area))  |>  
+      left_join(
+        tmp.mcp1m[, c("id_month", "area", "x_vertices", "y_vertices",
+                      "grid.id.100km", "grid.id.10km", "grid.id.1km")],
+        by = "id_month") |>  
+      mutate(iou1m = cumsum.d24h / sqrt(area)) |>  
       filter(!is.na(iou1m)) |> ungroup() |> 
-      dplyr::select(individual_id,month,year,year_month,iou1m,mean.x,mean.y) |> 
+      dplyr::select(individual_id, month, year, year_month, iou1m,
+                    x_vertices, y_vertices, grid.id.100km, grid.id.10km, grid.id.1km) |> 
       mutate(individual_id = as.character(individual_id))
   }
 
 if(is.null(iou1m) || nrow(iou1m) == 0) return(NULL)
-
-# Spatial annotation 10km
-cell_info_10 <- dgGEO_to_SEQNUM(dggs.10, iou1m$mean.x, iou1m$mean.y)
-iou1m$grid.id.10km <- cell_info_10$seqnum
-
-# Spatial annotation 1km
-cell_info_1 <- dgGEO_to_SEQNUM(dggs.1, iou1m$mean.x, iou1m$mean.y)
-iou1m$grid.id.1km <- cell_info_1$seqnum
 
 return(iou1m)
 }

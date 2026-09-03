@@ -1,38 +1,26 @@
 ## ----Daily IOU-------------------------------------------------------------
-calc_iou24h <- function(area,
-                        trk,
-                        dggs_10, 
-                        dggs_1) 
+calc_iou24h <- function(area, trk) 
 {
 tmp.mcp24h <- 
-  if(is.null(area)) NULL else {
-    area|>
-      mutate(id_ymd = paste(individual_id,ymd,sep="."))
-  }
+  if(is.null(area)) NULL else area
 
 iou24h <- 
   if(is.null(trk) | is.null(area)) NULL else {
     trk |>  
       group_by(ymd) %>% 
-      mutate(cumsumD1h = sum(d1h,na.rm=T),
-             mean.x = mean(lon),
-             mean.y = mean(lat)) %>% 
-      dplyr::select(individual_id,ymd,cumsumD1h,mean.x,mean.y) %>% distinct() %>%
-      left_join(tmp.mcp24h[,c("individual_id","ymd","area")],by = c("individual_id","ymd")) %>% 
-      mutate(iou24h = cumsumD1h/sqrt(area)) %>% 
+      mutate(cumsumD1h = sum(d1h, na.rm=T)) %>% 
+      dplyr::select(individual_id, ymd, cumsumD1h) %>% distinct() %>%
+      left_join(
+        tmp.mcp24h[, c("individual_id", "ymd", "area", "x_vertices", "y_vertices",
+                       "grid.id.100km", "grid.id.10km", "grid.id.1km")],
+        by = c("individual_id", "ymd")) %>% 
+      mutate(iou24h = cumsumD1h / sqrt(area)) %>% 
       filter(!is.na(iou24h)) |> 
-      dplyr::select(individual_id,ymd,iou24h,mean.x, mean.y)
+      dplyr::select(individual_id, ymd, iou24h,
+                    x_vertices, y_vertices, grid.id.100km, grid.id.10km, grid.id.1km)
   }
 
 if(is.null(iou24h) || nrow(iou24h) == 0) return(NULL)
-
-# Spatial annotation 10km
-cell_info_10 <- dgGEO_to_SEQNUM(dggs.10, iou24h$mean.x, iou24h$mean.y)
-iou24h$grid.id.10km <- cell_info_10$seqnum
-
-# Spatial annotation 1km
-cell_info_1 <- dgGEO_to_SEQNUM(dggs.1, iou24h$mean.x, iou24h$mean.y)
-iou24h$grid.id.1km <- cell_info_1$seqnum
 
 return(iou24h)
 }
