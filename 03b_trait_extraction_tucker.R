@@ -112,6 +112,9 @@ daily_from_hourly <- function(trk, tolerance_mins = 60) {
 ## ----load data--------------------------------------------------------------------------------------------------------
 movedata <- readRDS("./DATA/Tucker/Tucker_Road_Spatial.rds")
 
+#EXAMPLE
+movedata <-movedata[movedata$ID %in% levels(movedata$ID)[1],]
+
 #spatial grid
 dggs.100    <- dgconstruct(projection = "ISEA", area = 10000, resround='nearest')
 dggs.10     <- dgconstruct(projection = "ISEA", area = 100, resround='nearest')
@@ -152,58 +155,57 @@ animlocs.daily <- animlocs.1hourly  |>
 ## ----Calculate movement metrics-------------------------------------------------------------
 
 #1h displacement----
-d1h <- purrr::map_dfr(animlocs.1hourly,calc_d1h,dggs.10,dggs.1,.id = "track_name")
+d1h <- purrr::map_dfr(animlocs.1hourly,calc_d1h,dggs.100,dggs.10,dggs.1,.id = "track_name")
 sum.ind.d1h <- f_sum.ind.d1h(d1h) 
-#sum.monthly.ind.d1h <- f_sum.monthly.ind.d1h(d1h)
 d1h_split <- split(d1h, d1h$individual_id)
 sum.monthly.ind.d1h <- lapply(d1h_split, f_sum.monthly.ind.d1h)
 sum.monthly.ind.d1h <- do.call(rbind, sum.monthly.ind.d1h)
 
 #24hr displacement distance----
-d24h <- purrr::map_dfr(animlocs.daily,calc_d24h,dggs.10,dggs.1,.id = "track_name")
+d24h <- purrr::map_dfr(animlocs.daily,calc_d24h,dggs.100,dggs.10,dggs.1,.id = "track_name")
 sum.ind.d24h <- f_sum.ind.d24h(d24h)
 d24h_split <- split(d24h, d24h$individual_id)
 sum.monthly.ind.d24h <- lapply(d24h_split, f_sum.monthly.ind.d24h)
 sum.monthly.ind.d24h <- do.call(rbind, sum.monthly.ind.d24h)
 
 #Maximum 24hr displacement distance----
-dmax24h <- purrr::map_dfr(animlocs.1hourly,calc_dmax24h,dggs.10,dggs.1,.id = "track_name")
+dmax24h <- purrr::map_dfr(animlocs.1hourly,calc_dmax24h,dggs.100,dggs.10,dggs.1,.id = "track_name")
 sum.ind.dmax24h <- f_sum.ind.dmax24h(dmax24h)
 dmax24h_split <- split(dmax24h, dmax24h$individual_id)
 sum.monthly.ind.dmax24h <- lapply(dmax24h_split, f_sum.monthly.ind.dmax24h)
 sum.monthly.ind.dmax24h <- do.call(rbind, sum.monthly.ind.dmax24h)
 
 #Maximum 1month displacement distance----
-dmax1m <- purrr::map_dfr(animlocs.daily,calc_dmax1m,dggs.10,dggs.1,.id = "track_name")
+dmax1m <- purrr::map_dfr(animlocs.daily,calc_dmax1m,dggs.100,dggs.10,dggs.1,.id = "track_name")
 sum.ind.dmax1m <- f_sum.ind.dmax1m(dmax1m)
 sum.monthly.ind.dmax1m <- f_sum.monthly.ind.dmax1m(dmax1m)
 
 #Daily MCP----
-mcp24h <- purrr::map_dfr(animlocs.1hourly,calc_mcp24h,dggs.10,dggs.1,.id = "track_name")
+mcp24h <- purrr::map_dfr(animlocs.1hourly,calc_mcp24h,dggs.100,dggs.10,dggs.1,.id = "track_name")
 sum.ind.mcp24h <- f_sum.ind.mcp24h(mcp24h)
 mcp24h_split <- split(mcp24h, mcp24h$individual_id)
 sum.monthly.ind.mcp24h <- lapply(mcp24h_split, f_sum.monthly.ind.mcp24h)
 sum.monthly.ind.mcp24h <- do.call(rbind, sum.monthly.ind.mcp24h)
 
 #Monthly MCP----
-mcp1m <- purrr::map_dfr(animlocs.daily,calc_mcp1m,dggs.10,dggs.1,.id = "track_name")
+mcp1m <- purrr::map_dfr(animlocs.daily,calc_mcp1m,dggs.100,dggs.10,dggs.1,.id = "track_name")
 sum.ind.mcp1m <- f_sum.ind.mcp1m(mcp1m)
 sum.monthly.ind.mcp1m <- f_sum.monthly.ind.mcp1m(mcp1m)
 
 #Daily IOU----
-iou24h <- calc_iou24h(mcp24h,d1h, dggs.10, dggs.1)
+iou24h <- calc_iou24h(mcp24h,d1h)
 sum.ind.iou24h <- f_sum.ind.iou24h(iou24h)
 iou24h_split <- split(iou24h, iou24h$individual_id)
 sum.monthly.ind.iou24h <- lapply(iou24h_split, f_sum.monthly.ind.iou24h)
 sum.monthly.ind.iou24h <- do.call(rbind, sum.monthly.ind.iou24h)
 
 #Monthly IOU----
-iou1m <- calc_iou1m(mcp1m,d24h, dggs.10, dggs.1)
+iou1m <- calc_iou1m(mcp1m,d24h)
 sum.ind.iou1m <- f_sum.ind.iou1m(iou1m)
 sum.monthly.ind.iou1m <- f_sum.monthly.ind.iou1m(iou1m) 
 
 #Diurnality Index----
-di <- calc_di(d1h, dggs.10, dggs.1)
+di <- calc_di(d1h, dggs.100,dggs.10, dggs.1)
 sum.ind.di <- f_sum.ind.di(di)
 di_split <- split(di, di$individual_id)
 sum.monthly.ind.di <- lapply(di_split, f_sum.monthly.ind.di)
@@ -301,6 +303,17 @@ colnames(grid.id.100km)[5] <- "grid.id.100km"
 grid.id.10km <- purrr::map(animlocs.1hourly, get_monthly_grids, dggs = dggs.10)
 grid.id.10km <- purrr::map_dfr(grid.id.10km, ~ .x, .id = "individual_id")
 colnames(grid.id.10km)[5] <- "grid.id.10km"
+
+grid.id.1km <- purrr::map(animlocs.1hourly, get_monthly_grids, dggs = dggs.1)
+grid.id.1km <- purrr::map_dfr(grid.id.1km, ~ .x, .id = "individual_id")
+colnames(grid.id.1km)[5] <- "grid.id.1km"
+
+grid.df <- data.frame(
+  individual_id = names(grid.id.100km),
+  grid.id.100km = sapply(grid.id.100km, paste, collapse = ";"),
+  grid.id.10km = sapply(grid.id.10km, paste, collapse = ";"),
+  grid.id.1km = sapply(grid.id.1km, paste, collapse = ";"),
+  row.names = NULL)
 
 individual.monthly.traits.tucker <- individual.monthly.traits.tucker  |> 
   left_join(grid.df, by = "individual_id") |> 
