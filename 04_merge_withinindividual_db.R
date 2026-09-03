@@ -142,10 +142,10 @@ colnames(db.movebank.4)[colnames(db.movebank.4) %nin% colnames(db.tucker)]
 colnames(db.tucker)[colnames(db.tucker) %nin% colnames(db.movebank.4)]
 
 ## bind database
-MoveTrait.v0.1.spatial <- plyr::rbind.fill(db.movebank.4,db.tucker)
-dim(MoveTrait.v0.1.spatial)
+withinindividual.db <- plyr::rbind.fill(db.movebank.4,db.tucker)
+dim(withinindividual.db)
 
-MoveTrait.v0.1.spatial.2 <- MoveTrait.v0.1.spatial |> 
+withinindividual.db <- withinindividual.db |> 
   dplyr::select("study_id","individual_id","individual_local_identifier",
                 "species","common_name","class","movement.mode",
                 "sex","animal_mass","animal_life_stage","source",
@@ -160,9 +160,9 @@ MoveTrait.v0.1.spatial.2 <- MoveTrait.v0.1.spatial |>
 ## ----Save within-individual level Database-------------------------------------------------------------
 
 # 8220 bird ind., 7986 mammal ind. - 16206 ind total
-MoveTrait.v0.1.spatial.2 |> tally()
-MoveTrait.v0.1.spatial.2 |> group_by(class) |>  tally()
-MoveTrait.v0.1.spatial.2 |> group_by(source) |>  tally()
+withinindividual.db |> tally()
+withinindividual.db |> group_by(class) |>  tally()
+withinindividual.db |> group_by(source) |>  tally()
 
 pthdb <- paste0(pathTOfolder,"8.MoveTraits_db/")
-saveRDS(MoveTrait.v0.1.spatial.2, file="./DATA/MoveTraitsData/8.MoveTraits_db/MoveTrait.v0.1_withinindividual_20260807.rds")
+saveRDS(withinindividual.db, file="./DATA/MoveTraitsData/8.MoveTraits_db/MoveTrait.v0.1_withinindividual_20260807.rds")
