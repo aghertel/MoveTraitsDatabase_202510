@@ -2,6 +2,7 @@
 ## ----24hr displacement distance-------------------------------------------------------------
 
 calc_d24h <- function(trk, 
+                         dggs_100,
                          dggs_10, 
                          dggs_1, 
                          dist_factor = 100000,
@@ -27,8 +28,12 @@ calc_d24h <- function(trk,
   
   # drop if too short
   if (nrow(out) < min_n) return(NULL)
+ 
+  # spatial annotation 100 km
+  cell_info_100 <- dgGEO_to_SEQNUM(dggs_100, out$lon, out$lat)
+  out$grid.id.100km <- cell_info_100$seqnum
   
-#if(is.null(out)) NULL else {
+ #if(is.null(out)) NULL else {
   # Spatial annotation 10km
   cell_info <- dgGEO_to_SEQNUM(dggs.10, out$lon, out$lat)
   out$grid.id.10km <- cell_info$seqnum
