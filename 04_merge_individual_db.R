@@ -219,10 +219,10 @@ colnames(db.movebank.4)[colnames(db.movebank.4) %nin% colnames(db.tucker)]
 colnames(db.tucker)[colnames(db.tucker) %nin% colnames(db.movebank.4)]
 
 ## bind database
-MoveTrait.v0.1 <- plyr::rbind.fill(db.movebank.4, db.tucker)
-dim(MoveTrait.v0.1)
+individual.db <- plyr::rbind.fill(db.movebank.4, db.tucker)
+dim(individual.db)
 
-MoveTrait.v0.1 <- MoveTrait.v0.1 |>
+individual.db <- individual.db |>
   dplyr::select(
     "study_id",
     "individual_id",
@@ -248,7 +248,7 @@ MoveTrait.v0.1 <- MoveTrait.v0.1 |>
 ## ----Save individual level Database-------------------------------------------------------------
 
 # final recode of species labels
-MoveTrait.v0.1 <- MoveTrait.v0.1 |>
+individual.db <- individual.db |>
   mutate(
     species = fct_recode(
       species,
@@ -271,16 +271,36 @@ MoveTrait.v0.1 <- MoveTrait.v0.1 |>
 
 # 108 bird sp., 55 mammal sp.
 # 187 bird sp., 68 mammal sp.
-MoveTrait.v0.1 |> filter(!duplicated(species)) |> group_by(class) |> tally()
+individual.db |> filter(!duplicated(species)) |> group_by(class) |> tally()
 # 3660 bird ind., 2691 mammal ind. - 6351 ind total
 # 8220 bird ind., 7620 mammal ind. - 15840 ind total
-MoveTrait.v0.1 |> tally()
-MoveTrait.v0.1 |> group_by(class) |> tally()
+individual.db |> tally()
+individual.db |> group_by(class) |> tally()
 #1777 tucker, 4574 movebank
-MoveTrait.v0.1 |> group_by(source) |> tally()
+individual.db |> group_by(source) |> tally()
+
+## ----remove grid coordinates that exceed agreed spatial resolution-------------------------------------------------------------
+individual.db <- readRDS("./DATA/MoveTraitsData/8.MoveTraits_db/MoveTrait.v0.1_individual.sum_20260807.rds")
+
+agreements <- readRDS("./DATA/MoveTraitsData/data_agreements/data_agreements.rds")
+
+# Apply spatial resolution restrictions from agreements:
+# individual == "10": both grid.id.10km and grid.id.100km retained
+# individual == "100": only grid.id.100km retained; grid.id.10km set to NA
+# Studies without a filled agreement are left unchanged
+individual.db_filtered <- individual.db |>
+  left_join(
+    agreements |> dplyr::select(Study_id, individual) |> mutate(Study_id = bit64::as.integer64(Study_id)),
+    by = c("study_id" = "Study_id")) |>
+  mutate(grid.id.10km = case_when(
+    individual == "100" ~ NA,
+    .default = grid.id.10km)) |>
+  select(-individual)
+
+## ----save database -------------------------------------------------------------
 
 dir.create(paste0(pathTOfolder, "8.MoveTraits_db"))
 pthdb <- paste0(pathTOfolder, "8.MoveTraits_db/")
-saveRDS(
-  MoveTrait.v0.1,
-  file = "./DATA/MoveTraitsData/8.MoveTraits_db/MoveTrait.v0.1_individual.sum_20260807.rds")
+saveRDS(individual.db_filtered,file = "./DATA/MoveTraitsData/8.MoveTraits_db/MoveTrait.v0.1_individual.sum_20260807.rds")
+
+

@@ -159,8 +159,31 @@ colnames(db.tucker)[colnames(db.tucker) %nin% colnames(db.movebank.4)]
 monthly.db <- plyr::rbind.fill(db.movebank.4,db.tucker)
 dim(monthly.db)
 
+## ----remove grid coordinates that exceed agreed spatial resolution-------------------------------------------------------------
+monthly.db <- readRDS("./DATA/MoveTraitsData/8.MoveTraits_db/MoveTrait.v0.1_monthly.sum_20260807.rds")
+
+agreements <- readRDS("./DATA/MoveTraitsData/data_agreements/data_agreements.rds")
+
+# Apply spatial resolution restrictions from agreements:
+# individual_monthly == "1":   all three grid columns retained
+# individual_monthly == "10":  grid.id.1km set to NA; grid.id.10km and grid.id.100km retained
+# individual_monthly == "100": grid.id.1km and grid.id.10km set to NA; only grid.id.100km retained
+# Studies without a filled agreement are left unchanged
+monthly.db_filtered <- monthly.db |>
+  left_join(
+    agreements |> dplyr::select(Study_id, individual_monthly) |> mutate(Study_id = bit64::as.integer64(Study_id)),
+    by = c("study_id" = "Study_id")) |>
+  mutate(
+    grid.id.1km = case_when(
+      individual_monthly %in% c("10", "100") ~ NA,
+      .default = grid.id.1km),
+    grid.id.10km = case_when(
+      individual_monthly == "100" ~ NA,
+      .default = grid.id.10km)) |>
+  select(-individual_monthly)
+
 ## ----Save monthly database-------------------------------------------------------------
-monthly.db <- monthly.db |> 
+monthly.db_filtered <- monthly.db_filtered |> 
   dplyr::select("study_id","individual_id","individual_local_identifier",
                 "species","common_name","class",
                 "movement.mode",
@@ -173,5 +196,4 @@ monthly.db <- monthly.db |>
                 "n.di.days":"di.05","dmax1m","mcp1m","iou1m",
                 "contact_person_name","license_type","citation","source")
 
-saveRDS(monthly.db, file="./DATA/MoveTraitsData/8.MoveTraits_db/MoveTrait.v0.1_monthly.sum_20260519.rds")
-
+saveRDS(monthly.db_filtered, file="./DATA/MoveTraitsData/8.MoveTraits_db/MoveTrait.v0.1_monthly.sum_20260807.rds")

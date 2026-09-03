@@ -42,7 +42,6 @@ MoveTrait.v0.1.sp2 <-
          movement.mode = unique(movement.mode),
          n.ind = n(),
          grid.id.100km = paste(unique(trimws(unlist(strsplit(na.omit(grid.id.100km), ";")))),collapse = ";"),
-         grid.id.10km = paste(unique(trimws(unlist(strsplit(na.omit(grid.id.10km), ";")))),collapse = ";"),
          across(
            ends_with(".mean"),
            list(
@@ -54,9 +53,12 @@ MoveTrait.v0.1.sp2 <-
          contact_person_name = paste(unique(contact_person_name), collapse = ", ")) |>
   ungroup() |>
   dplyr::select(species,common_name,n.ind,class,movement.mode,grid.id.100km,grid.id.10km,
-                contact_person_name,ends_with("_mean"),ends_with("_mean"),
-                ends_with("_cv"),ends_with("_n")) |> 
+                contact_person_name,starts_with("d1h_"),starts_with("d24h_"),
+                starts_with("dmax24h_"),starts_with("dmax1m_"),starts_with("dmax12m_"),
+                starts_with("mcp24h_"),starts_with("mcp1m_"),starts_with("mcp12m_"),
+                starts_with("iou24h_"),starts_with("iou1m_"),starts_with("iou12m_"),
+                starts_with("di_")) |> 
   distinct(species, .keep_all = TRUE) 
 
-
 saveRDS(MoveTrait.v0.1.sp2, file="./DATA/MoveTraitsData/8.MoveTraits_db/MoveTrait.v0.1_species.sum_20260807.rds")
+
