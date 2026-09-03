@@ -47,6 +47,7 @@ get_polygon_vertices <- function(mcp_spdf) {
 
 ## ----Monthly MCP-------------------------------------------------------------
 calc_mcp1m <- function(trk, 
+                       dggs_100,
                        dggs_10, 
                        dggs_1, 
                        min_days_n = 18) 
@@ -97,11 +98,13 @@ if (is.null(mcp.monthly)) {
       y_vertices = as.numeric(y_vertices)
     )
   
-  grid_10 <- dgGEO_to_SEQNUM(dggs.10, vertices_long$x_vertices, vertices_long$y_vertices)$seqnum
-  grid_1  <- dgGEO_to_SEQNUM(dggs.1,  vertices_long$x_vertices, vertices_long$y_vertices)$seqnum
+  grid_100 <- dgGEO_to_SEQNUM(dggs_100, vertices_long$x_vertices, vertices_long$y_vertices)$seqnum
+  grid_10 <- dgGEO_to_SEQNUM(dggs_10, vertices_long$x_vertices, vertices_long$y_vertices)$seqnum
+  grid_1  <- dgGEO_to_SEQNUM(dggs_1,  vertices_long$x_vertices, vertices_long$y_vertices)$seqnum
   
   vertices_long <- vertices_long |>
     mutate(
+      grid.id.100km = grid_100,
       grid.id.10km = grid_10,
       grid.id.1km = grid_1
     )
@@ -111,6 +114,7 @@ if (is.null(mcp.monthly)) {
     summarise(
       x_vertices = paste(x_vertices, collapse = ";"),
       y_vertices = paste(y_vertices, collapse = ";"),
+      grid.id.100km = paste(sort(unique(grid.id.100km)), collapse = ";"),
       grid.id.10km = paste(sort(unique(grid.id.10km)), collapse = ";"),
       grid.id.1km = paste(sort(unique(grid.id.1km)), collapse = ";"),
       .groups = "drop"

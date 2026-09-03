@@ -3,15 +3,31 @@ crs_moll <- sp::CRS("+proj=moll +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no
 
 ## ----Function to get corner coordinates (vertices)-------------------------------------------------------------
 get_polygon_vertices <- function(mcp_spdf) {
+  if (is.null(mcp_spdf) || length(mcp_spdf@polygons) == 0) return(NULL)
+  
   out <- lapply(seq_along(mcp_spdf@polygons), function(i) {
-    coords <- mcp_spdf@polygons[[i]]@Polygons[[1]]@coords
+    poly <- mcp_spdf@polygons[[i]]
+    if (length(poly@Polygons) == 0) return(NULL)
+    
+    coords <- poly@Polygons[[1]]@coords
+    if (is.null(coords) || nrow(coords) < 3) return(NULL)
+    
     if (all(coords[1, ] == coords[nrow(coords), ])) {
       coords <- coords[-nrow(coords), , drop = FALSE]
     }
+    if (nrow(coords) < 3) return(NULL)
     
-    tmp <- SpatialPoints(coords, proj4string = crs_moll)
-    tmp_ll <- spTransform(tmp, crs_4326)
-    coords_ll <- coordinates(tmp_ll)
+    tmp <- sp::SpatialPoints(coords, proj4string = crs_moll)
+    if (length(tmp) == 0) return(NULL)
+    
+    tmp_ll <- tryCatch(
+      sp::spTransform(tmp, crs_4326),
+      error = function(e) NULL
+    )
+    if (is.null(tmp_ll)) return(NULL)
+    
+    coords_ll <- sp::coordinates(tmp_ll)
+    if (is.null(coords_ll) || nrow(coords_ll) < 3) return(NULL)
     
     data.frame(
       id = mcp_spdf@data$id[i],
@@ -20,11 +36,16 @@ get_polygon_vertices <- function(mcp_spdf) {
       stringsAsFactors = FALSE
     )
   })
+  
+  out <- Filter(Negate(is.null), out)
+  if (length(out) == 0) return(NULL)
+  
   do.call(rbind, out)
 }
 
 ## ----Daily MCP-------------------------------------------------------------
 calc_mcp24h <- function(trk, 
+                         dggs_100, 
                          dggs_10, 
                          dggs_1, 
                          min_hours_n = 12) 
@@ -74,11 +95,13 @@ if (is.null(mcp.daily)) {
       y_vertices = as.numeric(y_vertices)
     )
   
-  grid_10 <- dgGEO_to_SEQNUM(dggs.10, vertices_long$x_vertices, vertices_long$y_vertices)$seqnum
-  grid_1  <- dgGEO_to_SEQNUM(dggs.1,  vertices_long$x_vertices, vertices_long$y_vertices)$seqnum
+  grid_100 <- dgGEO_to_SEQNUM(dggs_100, vertices_long$x_vertices, vertices_long$y_vertices)$seqnum
+  grid_10 <- dgGEO_to_SEQNUM(dggs_10, vertices_long$x_vertices, vertices_long$y_vertices)$seqnum
+  grid_1  <- dgGEO_to_SEQNUM(dggs_1,  vertices_long$x_vertices, vertices_long$y_vertices)$seqnum
   
   vertices_long <- vertices_long |>
     mutate(
+      grid.id.100km = grid_100,
       grid.id.10km = grid_10,
       grid.id.1km = grid_1
     )
@@ -88,6 +111,7 @@ if (is.null(mcp.daily)) {
     summarise(
       x_vertices = paste(x_vertices, collapse = ";"),
       y_vertices = paste(y_vertices, collapse = ";"),
+      grid.id.100km = paste(sort(unique(grid.id.100km)), collapse = ";"),
       grid.id.10km = paste(sort(unique(grid.id.10km)), collapse = ";"),
       grid.id.1km = paste(sort(unique(grid.id.1km)), collapse = ";"),
       .groups = "drop"
