@@ -17,6 +17,7 @@ f.diurn <- function(a, b, c, d) {((a / b) - (c / d)) / ((a / b) + (c / d))}
 
 
 calc_di <- function(trk, 
+                    dggs_100,
                         dggs_10, 
                         dggs_1, 
                         min_hours_n = 12) 
@@ -70,20 +71,15 @@ di <-
   }
 
 if(is.null(di)) NULL else {
+  # Spatial annotation 100km
+  cell_info_100 <- dgGEO_to_SEQNUM(dggs_100, di$mean.x, di$mean.y)
+  di$grid.id.100km <- cell_info_100$seqnum
   # Spatial annotation 10km
-  cell_info_10 <- dgGEO_to_SEQNUM(dggs.10, di$mean.x, di$mean.y)
+  cell_info_10 <- dgGEO_to_SEQNUM(dggs_10, di$mean.x, di$mean.y)
   di$grid.id.10km <- cell_info_10$seqnum
-  # centers_10 <- dgSEQNUM_to_GEO(dggs.10, di$grid.id.10km)
-  # di$lon.10km <- centers_10$lon_deg
-  # di$lat.10km <- centers_10$lat_deg
-  
   # Spatial annotation 1km
-  cell_info_1 <- dgGEO_to_SEQNUM(dggs.1, di$mean.x, di$mean.y)
+  cell_info_1 <- dgGEO_to_SEQNUM(dggs_1, di$mean.x, di$mean.y)
   di$grid.id.1km <- cell_info_1$seqnum
-  # centers_1 <- dgSEQNUM_to_GEO(dggs.1, di$grid.id.1km)
-  # di$lon.1km <- centers_1$lon_deg
-  # di$lat.1km <- centers_1$lat_deg
- 
 }
 return(di)
 }
