@@ -18,8 +18,13 @@ knitr::opts_chunk$set(echo = TRUE)
 knitr::opts_knit$set(root.dir = "DATA/MoveTraitsData/8.MoveTraits_db/")
 ```
 
+```{recho=FALSE, include=FALSE}
+setwd("DATA/MoveTraitsData/8.MoveTraits_db/")
+```
+
 ```{r packages, warning=FALSE,message=FALSE}
 library(tidyverse);library(bit64); library(geodata);library(dggridR);library(terra); library(sf); library(mapview);library(RColorBrewer);library(dplyr);library(stringr);library(purrr);library(ggspatial)
+mapviewOptions(basemaps = c("OpenStreetMap"))
 ```
 
 
@@ -364,7 +369,7 @@ mapview(intersect_cells_10_meanHFI[intersect_cells_10_meanHFI$year_month %in% "2
 # **Within Individual repeated trait measures**
 
 ```{r}
-mt_wind <- readRDS("MoveTrait.v0.1_withinindividual_20260807.rds")
+mt_wind <- readRDS("Data/MoveTraitsData/8.MoveTraits_db/MoveTrait.v0.1_withinindividual_20260807.rds")
 ```
 
 The third level of the database provides repeated individual trait measures. For each individual and every trait we provide the underlying repeated trait measures as a list of nested dataframes in columns 12 - 23
@@ -457,42 +462,43 @@ Alternatively, these vertex coordinates are diffused at 1 or 10 km allowing to r
 
 ```{r}
 all_mcp1m <- mt_wind[mt_wind$individual_id == focal_individual, "mcp1m"][[1]]
-head(all_mcp1m)
+View(all_mcp1m)
 example.mcp1m <- all_mcp1m[1,]
 ```
 
 We select a single monthly home range for demonstration purposes.
 
 ### Observation level data
-Function to reproduce home ranges for individuals with observation level data.
 
+Workflow to reproduce home ranges for individuals with observation level data.
+
+First - turn the information stored in columns x_vertices and y_vertices into spatial points
 ```{r}
-vertices_to_polygon <- function(x_vertices, y_vertices) {
-  x <- as.numeric(str_split(x_vertices, ";", simplify = TRUE))
-  y <- as.numeric(str_split(y_vertices, ";", simplify = TRUE))
-  
-  coords <- cbind(x, y)
-  coords <- coords[complete.cases(coords), , drop = FALSE]
-  
-  if (!all(coords[1, ] == coords[nrow(coords), ])) {
-    coords <- rbind(coords, coords[1, , drop = FALSE])
-  }
-  
-  st_polygon(list(coords))
-}
+mcp_vertices <- example.mcp1m %>%
+  mutate(month = as.factor(month)) %>%
+  rowwise() %>%
+  mutate(
+    x = list(as.numeric(str_split(x_vertices, ";", simplify = TRUE))),
+    y = list(as.numeric(str_split(y_vertices, ";", simplify = TRUE)))
+  ) %>%
+  ungroup() %>%
+  unnest(cols = c(x, y)) %>%
+  filter(!is.na(x), !is.na(y)) %>%
+  st_as_sf(coords = c("x", "y"), crs = 4326)
 ```
 
+Then reconstruct the MCP polygon as the convex hull of its vertices
 ```{r}
-mcp_observation <- example.mcp1m %>%
-  mutate(
-    geometry = map2(x_vertices, y_vertices, vertices_to_polygon),
-    month = as.factor(month)) %>%
-  st_as_sf(sf_column_name = "geometry", crs = 4326)
+mcp_observation <- mcp_vertices %>%
+  group_by(id, month, year_month, area, grid.id.10km, grid.id.1km) %>%
+  summarise(geometry = st_convex_hull(st_combine(geometry)), .groups = "drop") %>%
+  st_as_sf(crs = 4326)
 ```
 
 ```{r}
 mapview(mcp_observation,
-        col.regions = colorRampPalette(rev(brewer.pal(11, "RdYlBu"))))
+        col.regions = colorRampPalette(rev(brewer.pal(11, "RdYlBu")))) +
+  mapview(mcp_vertices, cex = 3, col.regions = "black", layer.name = "MCP vertices")
 ```
 
 
@@ -518,8 +524,9 @@ grid_sf <- dgcellstogrid(dggs.1, cells_long$grid.id.1km) |>
   left_join(cells_long,year_month, by = c("seqnum" = "grid.id.1km")) 
 
 mapview(grid_sf,
-        col.regions = colorRampPalette(rev(brewer.pal(11, "RdYlBu"))),
-        layer.name = "Home range vertices") 
+        color = "red", col.regions = "red",
+        layer.name = "Gridded MCP vertices") +
+  mapview(mcp_vertices, cex = 3, col.regions = "black", layer.name = "MCP vertices")
 ```
 
 ### 3. recreate the MCP based on the grid cells
@@ -528,21 +535,24 @@ mapview(grid_sf,
 mcp_1km <- grid_sf %>%
   group_by(year_month) %>%
   summarise(geometry = st_union(geometry), .groups = "drop") |> 
-  mutate(geometry = st_convex_hull(geometry))
+  mutate(geometry = st_convex_hull(geometry))|>
+  select(-year_month)
 ```
 
 This individual's data were open access and we hence can show the vertices of the calcualted MCP - here in orange. The vertices fall into three adjacent 10km grid cells. For closed access data, we do not know where the observed vertices were placed but we can reconstruct an area within which the home range falls by drawing a polygon around the annotated grid cells. 
 
 ```{r,echo=FALSE}
-mapview(grid_sf,
+  mapview(mcp_vertices, cex = 3, col.regions = "black", 
+          layer.name = "MCP vertices")+
+  mapview(grid_sf,
         alpha.regions = 0, color = "red", col.regions = "red", lwd = 2,
-        layer.name = "Annotation grid cells") +
-  mapview(mcp_1km,
-          alpha.regions = 0, color = "blue", col.regions = "blue", lwd = 2,
-          layer.name = "Derived MCP") +
+        layer.name = "Gridded MCP vertices") +
   mapview(mcp_observation,
           alpha.regions = 0, color = "orange", col.regions = "orange", lwd = 2,
-          layer.name = "Observed MCP")
+          layer.name = "Observed MCP")+
+   mapview(mcp_1km,alpha.regions = 0, 
+           color = "blue", col.regions = "blue", zcol = NULL, lwd = 2,
+          layer.name = "Derived MCP") 
 ```
 
 For 10 km grid cells this recreated home range is obviously much less precise.
