@@ -8,7 +8,7 @@ calc_d24h <- function(trk,
                          dist_factor = 100000,
                          mindt = 20, 
                          maxdt = 28,
-                         min_n = 30) 
+                         min_n = 18) 
 { 
   out <- trk %>% 
   mutate(d24h = step_lengths(.)*dist_factor) |> 
