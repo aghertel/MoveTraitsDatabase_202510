@@ -17,7 +17,7 @@ library(move2)
 library(bit64)
 library(units)
 library(R.utils)
-
+library(tidyverse)
 # specify account to use in the R session
 options("move2_movebank_key_name" = "MoveTraits")
 
@@ -27,7 +27,34 @@ pthDownld <- paste0(pathTOfolder, "1.MB_indv_mv2/")
 
 ### studies to download
 allstudies <- readRDS(paste0(pathTOfolder, "full_table_all_studies.rds"))
-Ids_toDo <- allstudies$id
+ 
+#allstudies <- id
+
+### check download progress and filter studies to re-run ####
+# parse downloaded files: extract study ID (everything before the first "_")
+download_counts <- tibble(
+  filename = list.files(pthDownld),
+  study_id  = bit64::as.integer64(sub("_.*", "", filename))
+) |>
+  dplyr::count(study_id, name = "n_downloaded")
+
+study_progress <- allstudies |>
+  dplyr::select(id, number_of_individuals) |>
+  dplyr::mutate(n_expected = as.integer(units::drop_units(number_of_individuals))) |>
+  dplyr::left_join(download_counts, by = c("id" = "study_id")) |>
+  dplyr::mutate(
+    n_downloaded = tidyr::replace_na(n_downloaded, 0L),
+    pct_done     = n_downloaded / n_expected
+  )
+
+nrow(study_progress[study_progress$pct_done == 1,])
+nrow(study_progress)
+
+# re-run studies where fewer than this fraction of individuals were downloaded
+threshold <- 0.9
+Ids_toDo <- study_progress |>
+  dplyr::filter(pct_done < threshold) |>
+  dplyr::pull(id)
 
 #### download by individual. object "result" only contains the error messages ######
 start_time <- Sys.time()
@@ -92,14 +119,14 @@ results <- lapply(Ids_toDo, function(studyId) {
   })
 })
 end_time <- Sys.time()
-end_time - start_time #
+end_time - start_time 
 
 
-# saveRDS(results,paste0(saveErrorPath,"all",".rds"))
+saveRDS(results,"./DATA/MoveTraitsData/error/all_shared.rds")
 
 is.error <- function(x) inherits(x, "try-error")
 table(vapply(results, is.error, logical(1)))
-names(results) <- seq_along(results)
+names(results) <- Ids_toDo
 results[vapply(results, is.error, logical(1))]
 # Check studies that returned errors:
-giveError <- Ids_toDo[vapply(results, is.error, logical(1))]
+error_ids <- Ids_toDo[vapply(results, is.error, logical(1))]
