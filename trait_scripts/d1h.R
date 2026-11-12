@@ -4,7 +4,7 @@ calc_d1h <- function(trk,
                      dggs_100,
                      dggs_10,
                      dggs_1,
-                     min_n = 167,
+                     min_n = 12,
                      dist_factor = 100000,
                      mindt = 45,
                      maxdt = 75) {
@@ -21,8 +21,7 @@ calc_d1h <- function(trk,
            "lon" = "x_",
            "lat" = "y_") 
     
-    
-  
+
   # drop if too short
   if (nrow(out) < min_n) return(NULL)
   
