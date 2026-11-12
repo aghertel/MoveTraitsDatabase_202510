@@ -57,18 +57,15 @@ metadata <- readRDS(paste0(pathTOfolder2,"/referenceTableStudies_ALL_excludedCol
 
 metadata <- 
   metadata |>
-  mutate(individual_id = sapply(str_split(fileName, "_|\\."), function(x) x[2])) |>
+  #mutate(individual_id = sapply(str_split(fileName, "_|\\."), function(x) x[2])) |>
   dplyr::select(MBid,individual_id,individual_local_identifier,species,sex,animal_mass,
                 animal_life_stage,manipulation_type,median_timelag_mins,
                 tracking_duration_days, tracking_start_date, tracking_end_date,excluded) |> 
-  rename(study_id = MBid) |> 
-  mutate(study_individual = paste(study_id,individual_id,sep="_")) |> 
-  filter(!duplicated(study_individual)) |> 
+  rename(study_id = MBid) |>
+  mutate(study_individual = paste(study_id,individual_id,sep="_")) |>
+  filter(!duplicated(study_individual)) |>
   dplyr::select(study_individual,individual_local_identifier,species,sex,animal_mass,
                 animal_life_stage,excluded) 
-
-#library(bit64)
-#metadata$study_id <- as.integer64(metadata$study_id)
 
 db.movebank.2 <- db.movebank.1 |>
   mutate(study_individual = paste(study_id,individual_id,sep="_")) |> 
