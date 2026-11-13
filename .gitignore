@@ -2,6 +2,8 @@
 DATA
 updates_work_in_progress/DATA
 updates_work_in_progress/Hex
+unused_scripts/
+updates_work_in_progress/
 # History files
 .Rhistory
 .Rapp.history

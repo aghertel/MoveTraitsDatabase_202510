@@ -31,28 +31,78 @@ agreements_bind <- csv_files |>
 agreements <- agreements_bind |> 
   dplyr::select(1:10)
 
-# Classify duplicated Study_ids as identical vs conflicting
-dup_ids <- agreements |>
+# Only these columns define whether two agreements are substantively the same;
+# differences in PI, submission date, etc. are ignored
+key_cols <- c("Study_id", "Study_Name", "species", "individual",
+              "individual_monthly", "within_individual")
+
+# Collapse duplicates on key columns, keeping the first record
+agreements_dedup <- agreements |>
+  distinct(across(all_of(key_cols)), .keep_all = TRUE)
+
+# Any Study_id still appearing more than once differs in at least one key column
+conflict_ids <- agreements_dedup |>
+  count(Study_id) |>
+  filter(n > 1) |>
+  pull(Study_id)
+
+# Clean: one row per Study_id, conflicts excluded pending review
+agreements_clean <- agreements_dedup |>
+  filter(!Study_id %in% conflict_ids)
+
+# Conflicts: one row per distinct version of each conflicting Study_id, for manual review
+agreements_conflicts <- agreements_dedup |>
+  filter(Study_id %in% conflict_ids) |>
+  arrange(Study_id)
+View(agreements_conflicts)
+
+# Resolve conflicts by keeping the most conservative agreement per Study_id.
+# Leniency rank per field (0 = most conservative):
+#   "Do not include" = 0, 100 km = 1, 10 km = 2, 1 km = 3, observation = 4
+res_cols <- c("species", "individual", "individual_monthly", "within_individual")
+
+leniency_rank <- function(x) {
+  case_when(
+    str_detect(x, regex("do not include", ignore_case = TRUE)) ~ 0L,
+    str_detect(x, regex("observation", ignore_case = TRUE))    ~ 4L,
+    str_extract(x, "\\d+") == "100"                            ~ 1L,
+    str_extract(x, "\\d+") == "10"                             ~ 2L,
+    str_extract(x, "\\d+") == "1"                              ~ 3L
+  )
+}
+
+# Called once per Study_id (see group_by below), so rows are only ever compared
+# with other agreements for the same study. Flags the first row that is at least
+# as strict as every other row in all four fields. If no such row exists (strict
+# on one field, lenient on another), or a value could not be ranked (NA), no row
+# is flagged.
+flag_strictest <- function(ranks) {
+  r <- as.matrix(ranks)
+  out <- rep(FALSE, nrow(r))
+  if (anyNA(r)) return(out)
+  dominant <- map_lgl(seq_len(nrow(r)), \(i) all(t(r) - r[i, ] >= 0))
+  if (any(dominant)) out[which(dominant)[1]] <- TRUE
+  out
+}
+
+agreements_conflicts_ranked <- agreements_conflicts |>
+  mutate(across(all_of(res_cols), leniency_rank, .names = "{.col}_rank")) |>
   group_by(Study_id) |>
-  filter(n() > 1) |>
-  pull(Study_id) |>
-  unique()
+  mutate(strictest = flag_strictest(pick(ends_with("_rank")))) |>
+  ungroup()
 
-id_classification <- agreements |>
-  filter(Study_id %in% dup_ids) |>
-  group_by(Study_id) |>
-  summarise(all_identical = nrow(distinct(pick(-source_file))) == 1)
+# Conflicts with a clear stricter agreement: keep that row
+agreements_conflicts_res <- agreements_conflicts_ranked |>
+  filter(strictest) |>
+  select(-ends_with("_rank"), -strictest)
 
-identical_ids <- id_classification |> filter(all_identical)  |> pull(Study_id)
-conflict_ids  <- id_classification |> filter(!all_identical) |> pull(Study_id)
+# No agreement is stricter on every field: needs manual review
+manual_review_ids <- setdiff(conflict_ids, agreements_conflicts_res$Study_id)
+agreements_manual_review <- agreements_conflicts |>
+  filter(Study_id %in% manual_review_ids)
+if (nrow(agreements_manual_review) > 0) View(agreements_manual_review)
 
-# Conflicts: Study_ids with differing rows — extract for manual review
-agreements_conflicts <- agreements |> filter(Study_id %in% conflict_ids)
-
-# Clean: keep one row for true duplicates, exclude conflicts pending review
-agreements_clean <- agreements |>
-  filter(!Study_id %in% conflict_ids) |>
-  distinct(across(-source_file), .keep_all = TRUE)
+agreements_clean <- rbind(agreements_clean, agreements_conflicts_res)
 
 # Expand peculiarity into binary yes/no columns (one per survey option)
 agreements_clean <- agreements_clean |>
@@ -84,24 +134,29 @@ agreements_clean2 <- agreements_clean |>
 
 saveRDS(agreements_clean2,"./DATA/MoveTraitsData/data_agreements/data_agreements.rds")
 
+nrow(agreements_clean2)
+
 ## ----Save pdfs for Kevin to send -------------------------------------------------------------
 
-# Copy PDFs from each unzipped subfolder into a single pdf folder
-pdf_out <- "./DATA/MoveTraitsData/data_agreements/data_agreements_pdf"
-dir.create(pdf_out, showWarnings = FALSE)
-
-pdf_files <- list.files(
-  "./DATA/MoveTraitsData/data_agreements",
-  pattern = "\\.pdf$",
-  full.names = TRUE,
-  recursive = TRUE
-) |>
-  Filter(\(f) !grepl("data_agreements_pdf", f), x = _)
-
-file.copy(pdf_files, pdf_out)
-
-# data owners
-send_agreement_pdf <- agreements_bind |> 
-  dplyr::select(Study_id,Study_Name,User_Surname,User_Firstname,User_Email,PI_Surname,PI_Firstname,PI_Email,PI_Alternate_Email,coauthor_Surname,coauthor_Firstname,coauthor_Email)
-
-write_csv(send_agreement_pdf,"./DATA/MoveTraitsData/data_agreements/data_agreements_pdf/send_agreement_pdf.csv")
+# # Copy PDFs from each unzipped subfolder into a single pdf folder
+# pdf_out <- "./DATA/MoveTraitsData/data_agreements/data_agreements_pdf"
+# dir.create(pdf_out, showWarnings = FALSE)
+# 
+# pdf_files <- list.files(
+#   "./DATA/MoveTraitsData/data_agreements",
+#   pattern = "\\.pdf$",
+#   full.names = TRUE,
+#   recursive = TRUE
+# ) |>
+#   Filter(\(f) !grepl("data_agreements_pdf", f), x = _)
+# 
+# file.copy(pdf_files, pdf_out)
+# 
+# # data owners
+# send_agreement_pdf <- agreements_bind |> 
+#   dplyr::select(Study_id,Study_Name,User_Surname,User_Firstname,User_Email,
+#                 PI_Surname,PI_Firstname,PI_Email,PI_Alternate_Email,
+#                 coauthor_Surname,coauthor_Firstname,coauthor_Email,
+#                 Alternate_Name,Alternate_Email,Alternate_Contact)
+# 
+# write_csv(send_agreement_pdf,"./DATA/MoveTraitsData/data_agreements/data_agreements_pdf/send_agreement_pdf.csv")
