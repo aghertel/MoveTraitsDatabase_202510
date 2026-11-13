@@ -41,3 +41,4 @@ po/*~
 rsconnect/
 clipboard-256
 .positai
+.DS_Store
